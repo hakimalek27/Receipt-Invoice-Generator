@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class DocumentAttachmentController extends Controller
 {
@@ -23,13 +24,33 @@ class DocumentAttachmentController extends Controller
     {
         $document = $this->scopedDocument($request, $document);
         $data = $request->validate([
-            'file' => 'required|file|max:10240',
+            'file' => [
+                'required',
+                'file',
+                'max:10240',
+                'mimes:jpg,jpeg,png,webp,pdf',
+                'mimetypes:image/jpeg,image/png,image/webp,application/pdf',
+            ],
             'caption' => 'nullable|string|max:255',
             'sort_order' => 'nullable|integer|min:0',
             'include_in_pdf' => 'nullable|boolean',
         ]);
 
         $file = $data['file'];
+        $originalName = str_replace('\\', '/', $file->getClientOriginalName());
+        if (str_contains($originalName, '/') || str_contains($originalName, '..')) {
+            throw ValidationException::withMessages([
+                'file' => 'Attachment filename must not contain path segments.',
+            ]);
+        }
+
+        $extension = strtolower($file->getClientOriginalExtension());
+        if (! in_array($extension, ['jpg', 'jpeg', 'png', 'webp', 'pdf'], true)) {
+            throw ValidationException::withMessages([
+                'file' => 'Attachment type is not allowed.',
+            ]);
+        }
+
         $safeName = Str::uuid().'.'.$file->getClientOriginalExtension();
         $path = $file->storeAs(
             "documents/{$document->company_id}/{$document->id}/attachments",
@@ -40,7 +61,7 @@ class DocumentAttachmentController extends Controller
         $attachment = DocumentAttachment::create([
             'company_id' => $document->company_id,
             'document_id' => $document->id,
-            'original_name' => $file->getClientOriginalName(),
+            'original_name' => $originalName,
             'storage_path' => $path,
             'mime_type' => $file->getMimeType(),
             'size_bytes' => $file->getSize(),

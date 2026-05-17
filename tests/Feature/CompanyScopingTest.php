@@ -11,12 +11,11 @@ class CompanyScopingTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_app_boots(): void
+    public function test_guest_root_redirects_to_login(): void
     {
         $response = $this->get('/');
 
-        // Welcome page is public
-        $response->assertStatus(200);
+        $response->assertRedirect(route('login'));
     }
 
     public function test_auth_test_passes(): void

@@ -54,7 +54,7 @@
             <tbody>
                 @foreach($pageItems as $item)
                 <tr>
-                    <td>{{ $loop->parent->index * 15 + $loop->index + 1 }}</td>
+                    <td>{{ ($pageIndex * $itemsPerPage) + $loop->index + 1 }}</td>
                     <td>{{ $item->description }}</td>
                     <td class="r">{{ rtrim(rtrim(number_format($item->quantity, 2), '0'), '.') }}</td>
                     <td class="r">{{ number_format($item->unit_price, 2) }}</td>
@@ -74,5 +74,6 @@
         <div class="page-number">Muka {{ $pageIndex + 1 }} / {{ count($itemPages) }}</div>
     @endforeach
     <div class="footer">Dokumen janaan komputer</div>
+    @include('pdf.partials.artwork-pages')
 </body>
 </html>

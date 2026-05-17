@@ -40,7 +40,7 @@
     <div class="line"></div>
     <div class="center">
         <div class="total">TOTAL: {{ $document->currency }} {{ number_format($document->grand_total, 2) }}</div>
-        @if($amountWords)
+        @if(($showThermalAmountWords ?? false) && $amountWords)
         <div style="font-size:6pt; margin-top:4px;">{{ $amountWords }}</div>
         @endif
         <div class="line"></div>

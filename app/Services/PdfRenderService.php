@@ -6,6 +6,7 @@ use App\Models\Document;
 use App\Models\PdfRender;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class PdfRenderService
 {
@@ -24,7 +25,7 @@ class PdfRenderService
         $data = $this->renderData($document);
 
         $pdf = Pdf::loadView($template, $data)
-            ->setPaper($paperSize === '60mm' ? [0, 0, 170.08, 0] : $paperSize)
+            ->setPaper($paperSize === '60mm' ? $this->thermalPaperBox($document) : $paperSize)
             ->setOptions([
                 'defaultFont' => 'sans-serif',
                 'isHtml5ParserEnabled' => true,
@@ -87,6 +88,11 @@ class PdfRenderService
                 'official_receipt' => 'pdf.generic.official_receipt',
                 'delivery_order' => 'pdf.generic.delivery_order',
                 'cash_bill' => 'pdf.generic.cash_bill',
+                'credit_note' => 'pdf.generic.credit_note',
+                'debit_note' => 'pdf.generic.debit_note',
+                'purchase_order' => 'pdf.generic.purchase_order',
+                'payment_voucher' => 'pdf.generic.payment_voucher',
+                'proforma_invoice' => 'pdf.generic.proforma_invoice',
             ];
             $template = $genericMap[$documentType] ?? 'pdf.generic.invoice';
         }
@@ -100,7 +106,7 @@ class PdfRenderService
 
     public function renderData(Document $document): array
     {
-        $document->load('items', 'company', 'customer');
+        $document->load('items', 'company', 'customer', 'attachments');
 
         $company = $document->company;
         $customer = $document->customer;
@@ -126,6 +132,9 @@ class PdfRenderService
         // Paginate items: ~15 items per page for A4 (rough estimate)
         $perPage = $document->document_type === 'delivery_order' ? 20 : 15;
         $pages = $document->items->chunk($perPage);
+        if ($pages->isEmpty()) {
+            $pages = collect([collect()]);
+        }
         $totalPages = $pages->count();
 
         return [
@@ -134,11 +143,61 @@ class PdfRenderService
             'customer' => $customer,
             'items' => $document->items,
             'itemPages' => $pages,
+            'itemsPerPage' => $perPage,
             'totalPages' => $totalPages,
+            'attachments' => $this->attachmentPayloads($document),
             'amountWords' => $amountWords,
             'isLastPage' => false,
             'pageNumber' => 1,
         ];
+    }
+
+    private function thermalPaperBox(Document $document): array
+    {
+        $document->loadMissing('items');
+
+        $lineCount = max(1, $document->items->count());
+        $descriptionLines = $document->items->sum(function ($item) {
+            return max(1, (int) ceil(Str::length((string) $item->description) / 28));
+        });
+
+        $height = max(360, 220 + ($lineCount * 34) + ($descriptionLines * 12));
+
+        return [0, 0, 170.08, $height];
+    }
+
+    private function attachmentPayloads(Document $document): array
+    {
+        $prefix = "documents/{$document->company_id}/{$document->id}/attachments/";
+
+        return $document->attachments
+            ->where('include_in_pdf', true)
+            ->sortBy('sort_order')
+            ->values()
+            ->map(function ($attachment) use ($prefix) {
+                $path = str_replace('\\', '/', (string) $attachment->storage_path);
+                $safePath = ! str_contains($path, '..')
+                    && ! str_starts_with($path, '/')
+                    && str_starts_with($path, $prefix);
+
+                $dataUri = null;
+                $isImage = in_array($attachment->mime_type, ['image/jpeg', 'image/png', 'image/webp'], true);
+                if ($safePath && $isImage && Storage::disk('local')->exists($path)) {
+                    $bytes = Storage::disk('local')->get($path);
+                    $dataUri = 'data:'.$attachment->mime_type.';base64,'.base64_encode($bytes);
+                }
+
+                return [
+                    'id' => $attachment->id,
+                    'caption' => $attachment->caption,
+                    'original_name' => $attachment->original_name,
+                    'mime_type' => $attachment->mime_type,
+                    'size_bytes' => $attachment->size_bytes,
+                    'is_image' => $isImage,
+                    'data_uri' => $dataUri,
+                ];
+            })
+            ->all();
     }
 
     private function snapshotObject(array $snapshot): object
