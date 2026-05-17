@@ -1,0 +1,1255 @@
+{
+  "meta": {
+    "title": "DeepSeek v4 Pro Phase-by-Phase Implementation Plan for Receipt Invoice Generator",
+    "created_at": "2026-05-17T21:10:46+08:00",
+    "model_target": "deepseek-v4-pro",
+    "model_availability_note": "Verify against official DeepSeek API docs before execution; do not assume model availability if API list changes.",
+    "repo": "hakimalek27/Receipt-Invoice-Generator",
+    "local_workspace": "c:\\Projek Coding\\Receipt Invoice Generator",
+    "output_path": "handoff/deepseek-v4-pro-implementation-2026-05-17/deepseek-v4-pro-phase-implementation-plan.json",
+    "purpose": "Prompt/contract for DeepSeek v4 Pro to implement the system phase by phase with mandatory gates, tests, smoke checks, and stop conditions."
+  },
+  "deepseek_runtime_instruction": {
+    "role": "Act as a careful implementation agent. Implement only the current phase. Do not continue to the next phase until all required tests, smoke checks, and gates pass.",
+    "language": "Use English for code and technical identifiers. User-facing Malay/English labels must follow template requirements.",
+    "must_do_before_each_phase": [
+      "Read locked_decisions",
+      "Read canonical_source_registry",
+      "Read phase stop_conditions",
+      "State planned files/modules for the phase",
+      "Run relevant tests before declaring phase complete"
+    ],
+    "must_not_do": [
+      "Do not import historical Excel records as production data",
+      "Do not mix company templates or numbering",
+      "Do not allocate official number during draft",
+      "Do not implement full MyInvois submission in v1",
+      "Do not let AI or Telegram issue without confirmation",
+      "Do not mutate issued PDFs or issued snapshots silently"
+    ],
+    "phase_progress_rule": "If any required test fails, fix within current phase and rerun. If blocker remains, stop and report; do not proceed."
+  },
+  "locked_decisions": {
+    "historical_excel_policy": {
+      "source_exact": "Template reference only, not imported as production records.",
+      "user_intent": "Excel lama reference only, bukan import production.",
+      "implementation_guardrail": "No old workbook row, document number, customer, item, or total becomes live production data unless the user later starts a separate import project."
+    },
+    "document_design_policy": {
+      "source_exact": "Match plus kemas: preserve original design identity while improving spacing, typos, table consistency, and polish.",
+      "user_intent": "Design policy match + kemas.",
+      "implementation_guardrail": "Templates should visually follow the supplied company formats, but cleanup spacing, typo-level text, wrapping, alignment, table consistency, and professional polish."
+    },
+    "company_isolation": {
+      "source_exact": "Every company has separate profile, templates, records, numbering, and sequences.",
+      "user_intent": "Setiap company ada profile/template/numbering/sequence sendiri.",
+      "implementation_guardrail": "All database queries, renderers, API calls, Telegram flows, and sequence counters must be scoped by company_id."
+    },
+    "numbering_issue_rule": {
+      "source_exact": "Official numbers are generated only when a document is issued, not while it is a draft.",
+      "user_intent": "Official number hanya masa issued.",
+      "implementation_guardrail": "Draft documents use internal draft IDs only; final invoice/quotation/receipt/DO numbers are allocated transactionally at issue time."
+    },
+    "einvoice_v1_scope": {
+      "source_exact": "Metadata-ready only. MyInvois submission/signing/cancel/reject is not part of v1.",
+      "user_intent": "e-Invoice v1 metadata-ready sahaja.",
+      "implementation_guardrail": "Store future MyInvois fields and validation readiness, but do not build official submission, digital signing, cancel, reject, or reconciliation in v1."
+    },
+    "no_cross_company_numbering": {
+      "source_exact": "Wehdah, Persada, Virtue Damsel, and Nas Ceria numbering must never share one sequence.",
+      "user_intent": "Jangan campur numbering Wehdah, Persada, Virtue Damsel, Nas Ceria.",
+      "implementation_guardrail": "Sequence scope must be company_id + document_type + year, with optional branch/project extension later."
+    },
+    "workspace_state": {
+      "source_exact": "Current workspace is empty, so build a new system rather than refactor an existing app.",
+      "user_intent": "Workspace asal kosong, bina sistem baru.",
+      "implementation_guardrail": "Future implementation should scaffold a new application and treat handoff folders as planning/reference material."
+    }
+  },
+  "source_reference_pack": {
+    "primary_pack": "handoff/claude-audit-pack-2026-05-17",
+    "crosscheck_json": "handoff/chatgpt-think-crosscheck-2026-05-17/receipt-invoice-generator-crosscheck-plan.json",
+    "chatgpt_report": "handoff/chatgpt-think-crosscheck-2026-05-17/source/deep-research-report.md",
+    "required_reference_files": [
+      {
+        "file_name": "Q-3118.xlsx",
+        "category": "excel",
+        "company": "Nas Ceria Services",
+        "document_family": "NAS Ceria Vertex42 quote/invoice",
+        "relative_path": "references/excel/Q-3118.xlsx",
+        "sha256": "cc5625accc08e4a1a524341a923802f85a8811f9badbe40f86d04ba2f887e534",
+        "audit_note": "8 sheets; NAS Ceria/Vertex42 style; Arial; quotation/invoice examples; item columns No, Item/Description, Qty, Rate, Amount."
+      },
+      {
+        "file_name": "Projek Masjid Muaz Bin jabal (2).xlsx",
+        "category": "excel",
+        "company": "Nas Ceria Services",
+        "document_family": "NAS Ceria quote/invoice with project sheets",
+        "relative_path": "references/excel/Projek Masjid Muaz Bin jabal (2).xlsx",
+        "sha256": "d33473c1ea6cd879f4570db72f0fd6a8d0324fae860e2d32654b81fdb52f0e7a",
+        "audit_note": "20 sheets; visible and hidden sheets; quotes/invoices mixed with inventory/costing sheets for Masjid Muadz/Muaz project."
+      },
+      {
+        "file_name": "INV-ABG HANIF BANNER.xlsx",
+        "category": "excel",
+        "company": "Wehdah Solution",
+        "document_family": "Wehdah invoice/quotation/artwork",
+        "relative_path": "references/excel/INV-ABG HANIF BANNER.xlsx",
+        "sha256": "f94811a36cb7c02e5bc7fa07d32f9dbc6732ae0aa3ed0e2121e41b88b028bc78",
+        "audit_note": "18 sheets; Wehdah Lao UI/Rockwell template family; many artwork pages; A4 invoice plus artwork confirmation layouts."
+      },
+      {
+        "file_name": "INV-ABG HANIF BANNER (1).xlsx",
+        "category": "excel",
+        "company": "Wehdah Solution",
+        "document_family": "Wehdah invoice/quotation/artwork",
+        "relative_path": "references/excel/INV-ABG HANIF BANNER (1).xlsx",
+        "sha256": "50757cdcbc72e328f71fe8492ea705c52cf6918b121adb2feae418a176233fa7",
+        "audit_note": "15 sheets; same Wehdah template family; ARTWORK sheet with invoice and artwork continuation pages."
+      },
+      {
+        "file_name": "INV-latest.xlsx",
+        "category": "excel",
+        "company": "Wehdah Solution",
+        "document_family": "Wehdah invoice/quotation/artwork latest",
+        "relative_path": "references/excel/INV-latest.xlsx",
+        "sha256": "d6b6eb5510c6393b9181d4beb941130ffd18b2da2eb8863d9518ad69aaab831e",
+        "audit_note": "16 sheets; Wehdah templates; includes recent artwork examples I-241207 and I-250110."
+      },
+      {
+        "file_name": "sham.xlsx",
+        "category": "excel",
+        "company": "Wehdah Solution",
+        "document_family": "Wehdah artwork invoice examples",
+        "relative_path": "references/excel/sham.xlsx",
+        "sha256": "54d43b2018dd96548446502f46ad49ec9313c981a0f4c0db3e8b98c33831351e",
+        "audit_note": "2 artwork sheets; Wehdah invoice layout with dense embedded artwork images."
+      },
+      {
+        "file_name": "QUOTATION MUBZ (1).xlsx",
+        "category": "excel",
+        "company": "Wehdah Solution",
+        "document_family": "Wehdah quotation/invoice plus blank billing templates",
+        "relative_path": "references/excel/QUOTATION MUBZ (1).xlsx",
+        "sha256": "9f93127362641d13c31237c8873ee7b8ac3d83f76d674e3df29151bc0fbc7bca",
+        "audit_note": "16 sheets; active Wehdah MUBZ quotation/invoice examples plus A To Z blank templates for DO, cash bill, PO, notes, receipt, voucher."
+      },
+      {
+        "file_name": "QUOTATION MUBZ (2).xlsx",
+        "category": "excel",
+        "company": "Wehdah Solution",
+        "document_family": "Wehdah quotation/invoice plus blank billing templates duplicate/reference",
+        "relative_path": "references/excel/QUOTATION MUBZ (2).xlsx",
+        "sha256": "3f50b9d8dc6686bb4f5298802979f3bc1dfcba13df387664a0e8ae7561b99b80",
+        "audit_note": "16 sheets; parsed structure matches QUOTATION MUBZ (1); keep as supplied reference for comparison."
+      },
+      {
+        "file_name": "INV-SIGNAGE dec.pdf",
+        "category": "pdf",
+        "company": "Wehdah Solution",
+        "document_family": "Wehdah issued invoice PDF with artwork page",
+        "relative_path": "references/pdf/INV-SIGNAGE dec.pdf",
+        "sha256": "27531486fdd80869f0ab2f08ce2b67d65b04904218936b63d4c0a752a19ef0f1",
+        "audit_note": "2 pages; page 1 invoice, page 2 artwork page; page size 1020x1320 pt; exact PDF output target for artwork attachment workflow."
+      },
+      {
+        "file_name": "PERSADA GEMILANG GLOBAL.xlsx",
+        "category": "excel",
+        "company": "Persada Gemilang Global",
+        "document_family": "Persada workbook with mixed template sheets",
+        "relative_path": "references/excel/PERSADA GEMILANG GLOBAL.xlsx",
+        "sha256": "9b39252fc057644dd4262a99613ba20d5bb7fe6e9546291be1bb33c3562ec582",
+        "audit_note": "13 sheets; canonical Persada billing sheet is INV 1; other sheets contain A To Z, Virtue, or Wehdah data and must not be treated as Persada canonical."
+      },
+      {
+        "file_name": "COP PERSADA GEMILANG GLOBAL.png",
+        "category": "image",
+        "company": "Persada Gemilang Global",
+        "document_family": "Persada stamp/chop",
+        "relative_path": "references/images/persada/COP PERSADA GEMILANG GLOBAL.png",
+        "sha256": "106e1eccf16b2b8e5e76360ff34b0774cf04c0c24e669d417f12c6d4e71454c4",
+        "audit_note": "PNG transparent stamp/chop; 294x296; blue company stamp with registration number."
+      },
+      {
+        "file_name": "Letterhead Persada Gemilang Global.jpg",
+        "category": "image",
+        "company": "Persada Gemilang Global",
+        "document_family": "Persada A4 letterhead",
+        "relative_path": "references/images/persada/Letterhead Persada Gemilang Global.jpg",
+        "sha256": "d90b4f275864e0e269637fd3ede94c1e6c0a7d7d0a97a7a9e1ab7454de6651ad",
+        "audit_note": "A4 letterhead background; 4963x7019; header logo/contact block, gradient bar, footer steps."
+      },
+      {
+        "file_name": "LOGO PERSADA GEMILANG GLOBAL.jpg",
+        "category": "image",
+        "company": "Persada Gemilang Global",
+        "document_family": "Persada logo",
+        "relative_path": "references/images/persada/LOGO PERSADA GEMILANG GLOBAL.jpg",
+        "sha256": "017e954c7df1db9f36240028a9572500980df56185651a4f2169ca55a48a09a5",
+        "audit_note": "JPG logo; 1048x408; navy/blue and green mark with uppercase wordmark."
+      }
+    ],
+    "heuristic_warning": "All workbook detected_* fields are audit heuristics only. Never treat them as canonical master data or sequence truth."
+  },
+  "canonical_source_registry": {
+    "purpose": "Machine-readable allowlist so mixed workbook sheets cannot leak into company identity, template, or numbering seeds.",
+    "global_rule": "Only canonical_for_render entries may drive v1 template implementation. non_canonical_reference_only may inform structure. deny_for_seeding must never seed live company data, templates, or sequences.",
+    "companies": {
+      "Wehdah Solution": {
+        "company_code": "WS",
+        "canonical_for_render": [
+          {
+            "document_types": [
+              "invoice",
+              "quotation"
+            ],
+            "files": [
+              "INV-ABG HANIF BANNER.xlsx",
+              "INV-ABG HANIF BANNER (1).xlsx",
+              "INV-latest.xlsx",
+              "QUOTATION MUBZ (1).xlsx",
+              "QUOTATION MUBZ (2).xlsx"
+            ],
+            "sheets": [
+              "INV",
+              "INV 1",
+              "INV 2",
+              "Quotation",
+              "INV 1 (2)",
+              "Copy of INV 1"
+            ],
+            "notes": "Use only sheets with Wehdah identity and real invoice/quotation layout."
+          },
+          {
+            "document_types": [
+              "invoice",
+              "quotation"
+            ],
+            "files": [
+              "INV-SIGNAGE dec.pdf"
+            ],
+            "sheets": [
+              "page 1 invoice",
+              "page 2 artwork"
+            ],
+            "notes": "Strongest output reference for Wehdah invoice plus artwork behavior."
+          },
+          {
+            "document_types": [
+              "invoice"
+            ],
+            "files": [
+              "sham.xlsx"
+            ],
+            "sheets": [
+              "ARTWORK",
+              "Frame Poster"
+            ],
+            "notes": "Dense artwork invoice examples."
+          }
+        ],
+        "non_canonical_reference_only": [
+          {
+            "files": [
+              "QUOTATION MUBZ (1).xlsx",
+              "QUOTATION MUBZ (2).xlsx",
+              "INV-ABG HANIF BANNER.xlsx",
+              "INV-latest.xlsx"
+            ],
+            "sheets": [
+              "Invoice",
+              "Invoice_Service",
+              "DO",
+              "Cash Bill",
+              "Purchase Order",
+              "Credit Note",
+              "Debit Note",
+              "Receipt",
+              "Payment Voucher"
+            ],
+            "notes": "A To Z generic structures inside Wehdah workbooks; usable only as generic document structure references."
+          }
+        ],
+        "deny_for_seeding": [
+          "Any old document number, customer, item, total, payment, or historical row from the Excel files"
+        ]
+      },
+      "Nas Ceria Services": {
+        "company_code": "NCS",
+        "canonical_for_render": [
+          {
+            "document_types": [
+              "quotation",
+              "invoice"
+            ],
+            "files": [
+              "Q-3118.xlsx"
+            ],
+            "sheets": [
+              "MAIN QUOTE",
+              "QUOTE 1",
+              "QUOTE 2",
+              "QUOTE 3",
+              "Tambah TV",
+              "Pindah TV",
+              "Tambah TV (2)"
+            ],
+            "notes": "NAS Ceria Vertex42/Arial quote and invoice visual family."
+          },
+          {
+            "document_types": [
+              "quotation",
+              "invoice"
+            ],
+            "files": [
+              "Projek Masjid Muaz Bin jabal (2).xlsx"
+            ],
+            "sheets": [
+              "MAIN QUOTE",
+              "4316",
+              "Copy of 3871",
+              "INV-2625",
+              "INV-2628",
+              "INV-2639",
+              "INV-2641",
+              "INV-2642"
+            ],
+            "notes": "Use only after sheet-by-sheet classification; workbook is mixed."
+          }
+        ],
+        "non_canonical_reference_only": [
+          {
+            "files": [
+              "Q-3118.xlsx",
+              "Projek Masjid Muaz Bin jabal (2).xlsx"
+            ],
+            "sheets": [
+              "Modal",
+              "Barang",
+              "Sheet1",
+              "hidden legacy sheets",
+              "VD2"
+            ],
+            "notes": "Costing, inventory, hidden, or Virtue partial sheets; not customer-facing NAS templates."
+          }
+        ],
+        "deny_for_seeding": [
+          "Bare historical numbers such as 3118, 2291, 1292, 3893, 4316 as production sequence truth"
+        ]
+      },
+      "Persada Gemilang Global": {
+        "company_code": "PGG",
+        "canonical_for_render": [
+          {
+            "document_types": [
+              "invoice"
+            ],
+            "files": [
+              "PERSADA GEMILANG GLOBAL.xlsx"
+            ],
+            "sheets": [
+              "INV 1"
+            ],
+            "notes": "Only canonical Persada billing sheet in the workbook."
+          },
+          {
+            "document_types": [
+              "invoice",
+              "quotation",
+              "official_receipt",
+              "formal_letter"
+            ],
+            "files": [
+              "LOGO PERSADA GEMILANG GLOBAL.jpg",
+              "COP PERSADA GEMILANG GLOBAL.png",
+              "Letterhead Persada Gemilang Global.jpg"
+            ],
+            "sheets": [],
+            "notes": "Use assets for Persada identity; letterhead is formal-doc background unless user confirms billing usage."
+          }
+        ],
+        "non_canonical_reference_only": [
+          {
+            "files": [
+              "PERSADA GEMILANG GLOBAL.xlsx"
+            ],
+            "sheets": [
+              "Quotation",
+              "Quotation_Service",
+              "INV 2",
+              "Invoice",
+              "Invoice_Service",
+              "DO",
+              "Cash Bill",
+              "Purchase Order",
+              "Credit Note",
+              "Debit Note",
+              "Receipt",
+              "Payment Voucher"
+            ],
+            "notes": "Mixed A To Z, Virtue, and Wehdah sheets; not Persada canonical."
+          }
+        ],
+        "deny_for_seeding": [
+          "Persada workbook sheets other than INV 1 for Persada company identity",
+          "Historical invoice no 202601030025 as production sequence truth"
+        ]
+      },
+      "Virtue Damsel Solution": {
+        "company_code": "VDS",
+        "canonical_for_render": [],
+        "non_canonical_reference_only": [
+          {
+            "files": [
+              "PERSADA GEMILANG GLOBAL.xlsx",
+              "Projek Masjid Muaz Bin jabal (2).xlsx"
+            ],
+            "sheets": [
+              "Quotation",
+              "VD2"
+            ],
+            "notes": "Partial mixed references only; not enough for final v1 tenant/template rollout."
+          }
+        ],
+        "deny_for_seeding": [
+          "Any final Virtue template, bank, tax, or numbering seed until user confirms active v1 inclusion and supplies missing assets"
+        ]
+      },
+      "A To Z Account": {
+        "company_code": "TEMPLATE_ONLY",
+        "canonical_for_render": [],
+        "non_canonical_reference_only": [
+          {
+            "document_types": [
+              "delivery_order",
+              "cash_bill",
+              "purchase_order",
+              "credit_note",
+              "debit_note",
+              "official_receipt",
+              "payment_voucher",
+              "service_invoice",
+              "service_quotation"
+            ],
+            "files": [
+              "Multiple workbooks"
+            ],
+            "sheets": [
+              "Invoice",
+              "Invoice_Service",
+              "DO",
+              "Cash Bill",
+              "Purchase Order",
+              "Credit Note",
+              "Debit Note",
+              "Receipt",
+              "Payment Voucher",
+              "Quotation_Service"
+            ],
+            "notes": "Reusable generic structure only. Not a real company unless user later confirms."
+          }
+        ],
+        "deny_for_seeding": [
+          "Company profile seeding as an actual tenant"
+        ]
+      }
+    }
+  },
+  "global_non_negotiable_guardrails": [
+    "Historical Excel files are reference templates only.",
+    "Design target is match + kemas, preserving company identity while improving layout discipline.",
+    "Every company has isolated profile, template, records, numbering, and sequences.",
+    "Official numbers only allocate at issue time inside a transaction.",
+    "e-Invoice v1 is metadata-ready only.",
+    "No cross-company numbering, branding, assets, or PDF cache leakage.",
+    "Issued PDFs and issued snapshots are immutable.",
+    "Phase gate tests must pass before proceeding."
+  ],
+  "company_template_design_contract": {
+    "Wehdah Solution": {
+      "must_match": [
+        "Lao UI/Rockwell feel",
+        "dark blue header/title areas",
+        "metadata block",
+        "Item/Description/Qty/Unit/Unit Price/Discount/Total Price table",
+        "RM amount-in-words area",
+        "bank details",
+        "terms",
+        "signature/chop",
+        "artwork pages after main document"
+      ],
+      "reference_priority": [
+        "INV-SIGNAGE dec.pdf",
+        "INV-latest.xlsx",
+        "INV-ABG HANIF BANNER.xlsx",
+        "sham.xlsx"
+      ]
+    },
+    "Nas Ceria Services": {
+      "must_match": [
+        "Vertex42/Arial compact style",
+        "No/Item Description/Qty/Rate/Amount table",
+        "customer/prepared-by/header/footer structure"
+      ],
+      "must_clean": [
+        "remove spreadsheet helper junk",
+        "do not use costing sheets as templates"
+      ]
+    },
+    "Persada Gemilang Global": {
+      "must_match": [
+        "INV 1 only as billing source",
+        "navy/green identity",
+        "Persada logo",
+        "transparent stamp/chop in signature area"
+      ],
+      "pending": [
+        "canonical address",
+        "website display",
+        "bank holder",
+        "TIN/SST",
+        "signer"
+      ]
+    },
+    "Virtue Damsel Solution": {
+      "status": "placeholder until user confirms active v1 scope and supplies canonical assets"
+    },
+    "A To Z Account": {
+      "status": "generic reference only, never seed as real company by default"
+    }
+  },
+  "document_type_contract": {
+    "v1_document_types": [
+      "quotation",
+      "invoice",
+      "official_receipt",
+      "delivery_order",
+      "cash_bill",
+      "credit_note",
+      "debit_note",
+      "purchase_order",
+      "payment_voucher",
+      "proforma_invoice"
+    ],
+    "renamed_internal_type": {
+      "from": "receipt",
+      "to": "official_receipt",
+      "reason": "Avoid ambiguity with 60mm quick-print receipt output."
+    },
+    "thermal_receipt": "Print layout/artifact for official receipt or cash bill, not automatically a separate legal document.",
+    "future_only": [
+      "refund_note",
+      "self_billed_invoice",
+      "self_billed_credit_note",
+      "self_billed_debit_note",
+      "self_billed_refund_note"
+    ]
+  },
+  "amount_in_words_contract": {
+    "feature_name": "amount_in_words",
+    "purpose": "Optional display of total amount in words on invoice, quotation, official receipt, and other amount-bearing documents.",
+    "fields_and_config": {
+      "documents.show_amount_in_words": "boolean",
+      "documents.amount_in_words_locale": "ms_MY | en_MY | custom",
+      "documents.amount_in_words_currency": "MYR default",
+      "documents.amount_in_words_text_snapshot": "text generated and stored at issue time",
+      "templates.amount_in_words_position": "template-controlled",
+      "templates.amount_in_words_label": "editable",
+      "templates.amount_in_words_zero_sen_style": "SAHAJA | DAN SIFAR SEN",
+      "templates.amount_in_words_case": "uppercase default for Excel-like references"
+    },
+    "default_malay_myr_example": {
+      "numeric_total": "RM 1,234,567.89",
+      "words": "RINGGIT MALAYSIA SATU JUTA DUA RATUS TIGA PULUH EMPAT RIBU LIMA RATUS ENAM PULUH TUJUH DAN LAPAN PULUH SEMBILAN SEN",
+      "spelling_note": "Use TIGA, not typo TUGA."
+    },
+    "rules": [
+      "Generate words from exact numeric grand_total after rounding rules are applied.",
+      "Never let amount-in-words disagree with numeric total.",
+      "If sen is 00, use template configured style: SAHAJA or DAN SIFAR SEN.",
+      "Negative amount words are allowed only for credit/debit/refund-style documents with explicit sign policy.",
+      "Currency wording must be configurable for non-MYR future support.",
+      "Generated words are snapshotted at issue time so future wording rule changes do not mutate issued documents.",
+      "Draft preview may regenerate, but issue snapshot freezes the text."
+    ],
+    "template_placement": {
+      "Wehdah Solution": "Near existing RM: amount-in-words section before or near Grand Total.",
+      "Nas Ceria Services": "Near total quote/invoice footer, outside the item table.",
+      "Persada Gemilang Global": "Near grand total/payment section matching INV 1 layout.",
+      "official_receipt": "Near amount/received total where space permits.",
+      "thermal_receipt": "Optional and default hidden because 60mm width is constrained."
+    },
+    "required_tests": [
+      "0.00",
+      "1.00",
+      "1.01",
+      "10.10",
+      "100.05",
+      "1234567.89",
+      "Malay spelling and sen handling",
+      "numeric total equals generated words source",
+      "snapshot unchanged after template wording setting changes"
+    ]
+  },
+  "multipage_pdf_contract": {
+    "feature_name": "multipage_pdf_pagination",
+    "purpose": "Ensure invoice, quotation, DO, receipt, and related PDFs remain professional when item lists or descriptions require additional pages.",
+    "rules": [
+      "A4 item tables must support multiple pages.",
+      "Repeat item table header on every continuation page.",
+      "Keep each item row together where possible; long descriptions wrap cleanly.",
+      "Totals, amount-in-words, bank details, terms, and signature/chop appear only on final main document page.",
+      "Footer/signature/chop must never overlap item rows.",
+      "Page numbering is recommended as Page X of Y and may be template-controlled.",
+      "Long customer addresses and project descriptions wrap without pushing metadata into item table.",
+      "If the document is a DO and template says prices are hidden, continuation pages must preserve hidden-price layout.",
+      "Wehdah main invoice/quotation pages must come before artwork pages by default.",
+      "Artwork pages append after all main document pages."
+    ],
+    "template_specific_rules": {
+      "Wehdah Solution": "Repeat item header on continuation pages; keep dark blue header identity; amount-in-words and grand total only on final main page; artwork pages after main document.",
+      "Nas Ceria Services": "Preserve compact Vertex42/Arial table proportions; remove spreadsheet junk; wrap long masjid/project text cleanly.",
+      "Persada Gemilang Global": "Use Persada brand header and stamp/signature final block; respect INV 1 layout and final-page totals.",
+      "A To Z generic": "Use only generic document structures for DO, PO, notes, official receipt, and payment voucher; do not seed company identity."
+    },
+    "required_tests": [
+      "1 item",
+      "10 items",
+      "25 items",
+      "60 items",
+      "long item description across several lines",
+      "mixed short and long items",
+      "multi-page invoice with amount-in-words on final page only",
+      "multi-page quotation with validity/payment terms retained",
+      "artwork pages append after all main pages",
+      "visual regression for Wehdah, NAS, and Persada"
+    ]
+  },
+  "numbering_contract": {
+    "policy_model_required": true,
+    "scope": "company_id + document_type + issue_year + optional future dimensions",
+    "policy_fields": [
+      "prefix",
+      "suffix",
+      "separator",
+      "year_token",
+      "sequence_padding",
+      "reset_policy",
+      "scope_dimensions",
+      "active_from",
+      "active_to"
+    ],
+    "issue_allocation": "Use row lock/transaction on sequence counter for company/document/year.",
+    "preview_rule": "Format example only; no reservation and no promise of actual next sequence.",
+    "phase_0_5_freeze_required_for": [
+      "Wehdah Solution",
+      "Nas Ceria Services",
+      "Persada Gemilang Global",
+      "Virtue Damsel Solution if active"
+    ]
+  },
+  "issue_time_snapshot_contract": {
+    "required_snapshots": [
+      "issuer_snapshot_json",
+      "buyer_snapshot_json",
+      "bank_snapshot_json",
+      "terms_snapshot_json",
+      "tax_snapshot_json",
+      "currency_fx_snapshot_json",
+      "template_version_id",
+      "issue_timezone_snapshot",
+      "amount_in_words_text_snapshot when enabled"
+    ],
+    "immutability_rule": "Issued snapshots must be used for issued views/exports and must not change when live profiles are edited later."
+  },
+  "schema_and_api_contract": {
+    "status": "Proposed contract for implementation. DeepSeek must adapt to actual framework conventions but preserve behavior.",
+    "required_concepts": [
+      "numbering_policies",
+      "sequence_counters",
+      "idempotency_keys",
+      "document_status_history",
+      "payment_allocations",
+      "pdf_renders",
+      "issue snapshots",
+      "line-level e-Invoice metadata"
+    ],
+    "issue_endpoint": {
+      "method": "POST",
+      "path": "/documents/{id}/issue",
+      "requires": [
+        "Idempotency-Key header",
+        "draft_hash body",
+        "confirmed_total body"
+      ],
+      "must_validate": [
+        "company scope",
+        "draft unchanged",
+        "total matches server recompute",
+        "required snapshots ready"
+      ]
+    },
+    "pdf_endpoint": {
+      "method": "GET",
+      "path": "/documents/{id}/pdf?version=N",
+      "rule": "Return immutable render version after authorization and company scope check."
+    }
+  },
+  "pdf_rendering_contract": {
+    "engine": "Playwright/Browsershot Chromium unless implementation discovers a better compatible option and documents why.",
+    "security": [
+      "no arbitrary local paths",
+      "no uncontrolled remote fetch",
+      "asset allowlist",
+      "private storage only",
+      "sanitize or rasterize SVG",
+      "MIME sniff uploads",
+      "path normalization",
+      "short-lived signed URLs"
+    ],
+    "font_controls": [
+      "Ensure reference fonts or acceptable bundled fallbacks are installed in container",
+      "Run visual regression if fallback differs"
+    ],
+    "immutability": "Final PDFs are stored in pdf_renders and not silently overwritten."
+  },
+  "artwork_attachment_contract": {
+    "default_order": "main document pages first, artwork pages after for Wehdah",
+    "supported_inputs": [
+      "jpg",
+      "jpeg",
+      "png",
+      "webp",
+      "pdf"
+    ],
+    "rules": [
+      "preserve original",
+      "generate previews",
+      "captions Artwork 1..N",
+      "confirmation line",
+      "sign/chop area",
+      "fit without crop unless user chooses crop mode"
+    ]
+  },
+  "thermal_receipt_contract": {
+    "width": "60mm",
+    "default_amount_in_words": "hidden unless enabled",
+    "tests": [
+      "line width",
+      "Unicode Malay text",
+      "QR size constraints",
+      "margin behavior",
+      "long item wrapping"
+    ]
+  },
+  "telegram_deepseek_ai_contract": {
+    "telegram_auth": "stable chat_id/user_id allowlist, not username only",
+    "confirmation_token": [
+      "draft_hash",
+      "company_id",
+      "user_id",
+      "chat_id",
+      "expires_at",
+      "idempotency_key"
+    ],
+    "ai_governance": [
+      "retention policy",
+      "redaction where possible",
+      "strict JSON schema",
+      "malformed JSON rejected",
+      "timeout fallback to manual entry",
+      "AI never chooses company",
+      "AI never chooses final number",
+      "AI never issues document"
+    ]
+  },
+  "einvoice_metadata_contract": {
+    "scope": "metadata-ready only, no submission/signing/cancel/reject in v1",
+    "line_level_required": [
+      "classification_code",
+      "tax_type",
+      "tax_rate",
+      "tax_amount",
+      "tax_exemption_reason"
+    ],
+    "document_level_required": [
+      "supplier snapshot",
+      "buyer snapshot",
+      "currency",
+      "fx rate snapshot when non-MYR",
+      "future MyInvois status placeholders"
+    ],
+    "reverify_before_phase": "Re-check official MyInvois SDK before Phase 6 implementation."
+  },
+  "security_backup_deployment_contract": {
+    "server": "Tencent Ubuntu 43.133.34.55",
+    "hardening": [
+      "SSH key only",
+      "fail2ban",
+      "unattended-upgrades",
+      "UFW default deny",
+      "PostgreSQL local/private only",
+      "SSL renewal alert",
+      "log target",
+      "secret rotation plan"
+    ],
+    "backup": [
+      "daily encrypted DB backup",
+      "daily file/storage backup",
+      "backup/media consistency check",
+      "restore drill before final acceptance"
+    ]
+  },
+  "phase_execution_plan": [
+    {
+      "phase": "0",
+      "name": "Audit ingestion and canonical registry",
+      "objective": "Read all handoff packs, preserve locked decisions, and classify every reference source before coding.",
+      "deliverables": [
+        "implementation backlog",
+        "canonical_source_registry",
+        "reference classification report",
+        "locked decision preservation report"
+      ],
+      "allowed_work_scope": [
+        "handoff reading",
+        "planning artifacts",
+        "no application scaffold"
+      ],
+      "required_tests": [
+        "JSON parse all handoff JSON files",
+        "all referenced source paths exist",
+        "canonical registry covers Wehdah, NAS, Persada, Virtue partial, A To Z generic"
+      ],
+      "smoke_tests": [
+        "Verify no historical Excel rows are marked production seed",
+        "Verify mixed sheets are non-canonical or deny-for-seeding"
+      ],
+      "gate_to_next_phase": "All canonical sources classified and locked decisions preserved exactly.",
+      "stop_conditions": [
+        "source reference missing",
+        "locked decision conflict",
+        "unclear canonical source for a template needed in v1"
+      ]
+    },
+    {
+      "phase": "0.5",
+      "name": "Missing info and v1 scope freeze",
+      "objective": "Freeze decisions that affect scaffold, schema, numbering, and template work.",
+      "deliverables": [
+        "company inclusion matrix",
+        "numbering policy freeze matrix",
+        "official_receipt taxonomy decision",
+        "amount-in-words default matrix",
+        "pagination behavior matrix",
+        "v1 scope freeze record"
+      ],
+      "allowed_work_scope": [
+        "planning artifacts",
+        "configuration decisions",
+        "no app scaffold until gate passes"
+      ],
+      "required_tests": [
+        "numbering policies exist for each confirmed company and document type",
+        "number preview documented as format-only",
+        "amount-in-words behavior defined per template family or deferred explicitly",
+        "pagination behavior defined for item-heavy docs"
+      ],
+      "smoke_tests": [
+        "Confirm Virtue Damsel is active/in-scope or placeholder-only",
+        "Confirm Persada canonical identity pending items are tracked"
+      ],
+      "gate_to_next_phase": "Phase 1/2 blockers resolved or explicitly deferred with editable placeholders.",
+      "stop_conditions": [
+        "final numbering cannot be represented by policy model",
+        "official_receipt vs thermal receipt remains ambiguous"
+      ]
+    },
+    {
+      "phase": "1",
+      "name": "Scaffold and infrastructure",
+      "objective": "Create the application foundation only after Phase 0.5 is closed.",
+      "deliverables": [
+        "Laravel/Inertia scaffold",
+        "PostgreSQL and Redis setup",
+        "auth baseline",
+        "roles and company scoping baseline",
+        "test baseline"
+      ],
+      "allowed_work_scope": [
+        "application scaffold",
+        "local Docker/dev environment",
+        "auth/company foundation"
+      ],
+      "required_tests": [
+        "app boots",
+        "baseline test suite passes",
+        "auth test passes",
+        "company scoping test passes"
+      ],
+      "smoke_tests": [
+        "login locally",
+        "create two companies in seed/test fixture",
+        "verify scoped user cannot see other company placeholder data"
+      ],
+      "gate_to_next_phase": "No boot errors and no company scoping bypass.",
+      "stop_conditions": [
+        "app cannot boot",
+        "tests cannot run",
+        "company scoping cannot be enforced"
+      ]
+    },
+    {
+      "phase": "2",
+      "name": "Master data and numbering",
+      "objective": "Implement company/customer/product/template metadata and collision-safe issue-time numbering.",
+      "deliverables": [
+        "company profile management",
+        "customers",
+        "products/services",
+        "template metadata",
+        "numbering_policies",
+        "sequence_counters",
+        "format-only number preview"
+      ],
+      "allowed_work_scope": [
+        "master data modules",
+        "numbering modules",
+        "admin configuration UI/API"
+      ],
+      "required_tests": [
+        "per-company sequence isolation",
+        "concurrent issue allocation simulation",
+        "year rollover Asia/Kuala_Lumpur",
+        "manual override future-only",
+        "draft has no official number",
+        "number preview does not reserve sequence"
+      ],
+      "smoke_tests": [
+        "configure WS and PGG different invoice policies",
+        "create drafts for both without official numbers",
+        "issue test fixture concurrently and verify uniqueness"
+      ],
+      "gate_to_next_phase": "No collision under concurrency and no official number allocated during draft.",
+      "stop_conditions": [
+        "company numbering leak",
+        "actual next number exposed as reservation",
+        "manual override can mutate issued number"
+      ]
+    },
+    {
+      "phase": "3",
+      "name": "Document workflow engine",
+      "objective": "Implement lifecycle, official_receipt, payments, allocations, snapshots, and immutable issued state.",
+      "deliverables": [
+        "document statuses",
+        "official_receipt document type",
+        "document_status_history",
+        "payment_allocations",
+        "issue-time snapshots",
+        "void/cancel reason flow"
+      ],
+      "allowed_work_scope": [
+        "document domain",
+        "payment domain",
+        "workflow tests"
+      ],
+      "required_tests": [
+        "draft to issue",
+        "quotation to invoice/DO",
+        "invoice to official_receipt",
+        "partial payment",
+        "multi-invoice payment",
+        "void/cancel with reason",
+        "issued snapshots unchanged after profile edit"
+      ],
+      "smoke_tests": [
+        "create quotation",
+        "convert to invoice",
+        "record partial payment",
+        "generate official receipt allocation",
+        "edit company profile and verify issued snapshot unchanged"
+      ],
+      "gate_to_next_phase": "Workflow tests pass and issued structured data is immutable.",
+      "stop_conditions": [
+        "receipt taxonomy ambiguous",
+        "payment allocation incorrect",
+        "issued snapshots mutate silently"
+      ]
+    },
+    {
+      "phase": "4",
+      "name": "PDF templates, pagination, amount-in-words, artwork, thermal",
+      "objective": "Implement reference-aligned PDFs with multi-page layout, optional amount-in-words, artwork pages, and 60mm thermal layout.",
+      "deliverables": [
+        "Wehdah template family",
+        "NAS Ceria template family",
+        "Persada template family",
+        "generic A To Z-derived structures",
+        "pdf_renders",
+        "amount-in-words generator",
+        "multi-page pagination",
+        "artwork pages",
+        "thermal 60mm layout"
+      ],
+      "allowed_work_scope": [
+        "PDF renderer",
+        "template CSS/HTML",
+        "visual fixtures",
+        "amount wording service",
+        "attachment preview for render"
+      ],
+      "required_tests": [
+        "A4 page dimensions",
+        "1/10/25/60 item pagination",
+        "repeated table headers",
+        "final-page totals only",
+        "amount-in-words cases 0.00, 1.00, 1.01, 10.10, 100.05, 1234567.89",
+        "Malay spelling uses TIGA",
+        "amount words snapshot unchanged after template setting edit",
+        "artwork pages after all main pages",
+        "thermal 60mm width and wrapping",
+        "no cross-company logo/template leak"
+      ],
+      "smoke_tests": [
+        "render Wehdah invoice with artwork",
+        "render NAS quotation with long masjid address",
+        "render Persada invoice with stamp",
+        "render multi-page invoice with amount-in-words only on final page"
+      ],
+      "gate_to_next_phase": "Visual/PDF checks pass and design follows canonical references closely without overlap or brand leaks.",
+      "stop_conditions": [
+        "PDF design cannot match references closely enough",
+        "item pagination overlaps totals/footer/signature",
+        "amount-in-words mismatch",
+        "artwork appears before main Wehdah invoice pages"
+      ]
+    },
+    {
+      "phase": "5",
+      "name": "API, Telegram, and DeepSeek AI",
+      "objective": "Expose safe APIs and AI-assisted drafting without allowing AI or Telegram to issue documents unsafely.",
+      "deliverables": [
+        "Sanctum API",
+        "OpenAPI docs",
+        "idempotency_keys",
+        "issue endpoint requiring Idempotency-Key and draft_hash",
+        "Telegram webhook",
+        "DeepSeek parser/drafter",
+        "confirmation-token contract",
+        "AI governance controls"
+      ],
+      "allowed_work_scope": [
+        "API controllers/routes",
+        "Telegram integration",
+        "AI parser service",
+        "security tests"
+      ],
+      "required_tests": [
+        "unauthorized Telegram rejected",
+        "chat ID allowlist enforced",
+        "webhook secret verified",
+        "prompt injection treated as data",
+        "malformed AI JSON rejected",
+        "server recomputes totals",
+        "confirmation replay rejected",
+        "confirmation expiry rejected",
+        "cross-company Telegram access rejected",
+        "DeepSeek outage fallback to manual draft",
+        "API idempotency double-submit safe"
+      ],
+      "smoke_tests": [
+        "create draft from Telegram text",
+        "preview draft",
+        "confirm with valid token",
+        "repeat confirmation and verify no duplicate issue"
+      ],
+      "gate_to_next_phase": "AI/Telegram cannot issue without valid human confirmation, idempotency, and matching draft hash.",
+      "stop_conditions": [
+        "AI chooses company or final number",
+        "Telegram issues without confirmation",
+        "total tampering accepted"
+      ]
+    },
+    {
+      "phase": "6",
+      "name": "e-Invoice metadata readiness",
+      "objective": "Implement metadata readiness only, without MyInvois submission scope creep.",
+      "deliverables": [
+        "supplier/buyer metadata",
+        "line-level classification/tax/exemption fields",
+        "currency and FX snapshots",
+        "future MyInvois status placeholders",
+        "future-only refund/self-billed block"
+      ],
+      "allowed_work_scope": [
+        "metadata fields",
+        "validation rules",
+        "no MyInvois submission/signing/cancel/reject"
+      ],
+      "required_tests": [
+        "required metadata validation",
+        "line-level classification/tax/exemption",
+        "MYR document without FX",
+        "non-MYR document with FX snapshot",
+        "refund/self-billed not exposed as v1 UI workflow"
+      ],
+      "smoke_tests": [
+        "issue invoice with metadata-ready fields",
+        "verify no external MyInvois API call is made"
+      ],
+      "gate_to_next_phase": "Metadata-ready behavior works without crossing into full submission.",
+      "stop_conditions": [
+        "MyInvois submission implemented in v1",
+        "future-only docs appear in v1 UI workflow"
+      ]
+    },
+    {
+      "phase": "7",
+      "name": "Security, backup, and Tencent production deploy",
+      "objective": "Deploy securely to Tencent Ubuntu with backups, monitoring, and production smoke evidence.",
+      "deliverables": [
+        "Nginx/SSL",
+        "UFW default deny",
+        "SSH key only",
+        "fail2ban",
+        "unattended-upgrades",
+        "PostgreSQL private/local only",
+        "queue workers",
+        "scheduler",
+        "backup script",
+        "restore drill evidence",
+        "log/SSL alerts",
+        "production smoke report"
+      ],
+      "allowed_work_scope": [
+        "deployment scripts/config",
+        "server hardening",
+        "production smoke tests"
+      ],
+      "required_tests": [
+        "production login",
+        "create draft per company",
+        "issue test document",
+        "download immutable PDF",
+        "queue worker processes job",
+        "backup created",
+        "restore test documented",
+        "SSL renewal alert configured"
+      ],
+      "smoke_tests": [
+        "full production issue flow for one test company",
+        "verify backup and log outputs"
+      ],
+      "gate_to_next_phase": "Final phase; all smoke and restore verification pass.",
+      "stop_conditions": [
+        "PostgreSQL exposed publicly",
+        "backup restore not tested",
+        "SSL not configured",
+        "production smoke fails"
+      ]
+    }
+  ],
+  "test_gate_matrix": {
+    "numbering": [
+      "concurrent issue",
+      "year rollover Asia/Kuala_Lumpur",
+      "manual override future-only",
+      "draft no official number"
+    ],
+    "amount_in_words": [
+      "0.00",
+      "1.00",
+      "1.01",
+      "10.10",
+      "100.05",
+      "1234567.89",
+      "Malay spelling and sen handling",
+      "numeric total equals generated words source",
+      "snapshot unchanged after template wording setting changes"
+    ],
+    "multipage_pdf": [
+      "1 item",
+      "10 items",
+      "25 items",
+      "60 items",
+      "long item description across several lines",
+      "mixed short and long items",
+      "multi-page invoice with amount-in-words on final page only",
+      "multi-page quotation with validity/payment terms retained",
+      "artwork pages append after all main pages",
+      "visual regression for Wehdah, NAS, and Persada"
+    ],
+    "workflow": [
+      "draft issue",
+      "convert quotation",
+      "partial payment",
+      "multi-invoice payment",
+      "void/cancel reason",
+      "issued snapshot immutability"
+    ],
+    "security": [
+      "path traversal rejection",
+      "signed URL expiry",
+      "unauthorized Telegram",
+      "prompt injection data-only",
+      "webhook replay rejected"
+    ],
+    "deployment": [
+      "production smoke",
+      "backup created",
+      "restore drill documented"
+    ]
+  },
+  "stop_conditions": [
+    "Locked decision conflict appears",
+    "Company/template/numbering leak is detected",
+    "Test gate fails and cannot be resolved in current phase",
+    "Historical Excel data is imported as production data",
+    "PDF design cannot match reference closely enough",
+    "Item pagination overlaps totals/footer/signature",
+    "Amount-in-words mismatches numeric total",
+    "Official number is allocated during draft",
+    "AI/Telegram can issue without confirmation",
+    "Issued PDF or issued snapshots can be silently changed",
+    "e-Invoice scope drifts into full MyInvois submission",
+    "Source reference file is missing"
+  ],
+  "required_progress_report_format": {
+    "before_phase": [
+      "phase id/name",
+      "locked decisions acknowledged",
+      "planned files/modules",
+      "risks/blockers",
+      "tests to run"
+    ],
+    "after_phase": [
+      "deliverables completed",
+      "tests run with results",
+      "smoke tests run with evidence",
+      "files changed",
+      "known deferred items",
+      "gate pass/fail",
+      "next phase readiness"
+    ],
+    "on_stop": [
+      "phase stopped",
+      "failed gate/condition",
+      "evidence",
+      "recommended fix",
+      "whether user decision is required"
+    ]
+  },
+  "final_acceptance_criteria": [
+    "All phases pass their gates in sequence",
+    "All locked decisions remain intact",
+    "Canonical source registry is obeyed",
+    "No company/template/numbering leak",
+    "Amount-in-words works and snapshots correctly",
+    "Multi-page PDFs do not overlap or lose final sections",
+    "Wehdah/NAS/Persada designs match approved references with match + kemas policy",
+    "AI/Telegram cannot bypass confirmation",
+    "e-Invoice remains metadata-ready only",
+    "Production smoke and backup restore pass"
+  ]
+}

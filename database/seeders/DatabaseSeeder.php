@@ -20,13 +20,6 @@ class DatabaseSeeder extends Seeder
 
     private function seedPolicies(int $companyId, string $code): void
     {
-        $shortCodes = [
-            'invoice' => 'INV', 'quotation' => 'Q', 'official_receipt' => 'REC',
-            'delivery_order' => 'DO', 'cash_bill' => 'CB', 'credit_note' => 'CN',
-            'debit_note' => 'DN', 'purchase_order' => 'PO', 'payment_voucher' => 'PV',
-            'proforma_invoice' => 'PI',
-        ];
-
         foreach ($this->documentTypes as $type) {
             NumberingPolicy::create([
                 'company_id' => $companyId,

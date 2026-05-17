@@ -15,6 +15,7 @@ class DocumentWorkflowService
 {
     public function __construct(
         private readonly NumberingService $numbering,
+        private readonly AmountInWordsService $amountInWords,
     ) {}
 
     /**
@@ -107,6 +108,16 @@ class DocumentWorkflowService
             $company = Company::find($document->company_id);
             $customer = $document->customer_id ? Customer::find($document->customer_id) : null;
 
+            // Generate amount-in-words if enabled
+            $amountWordsText = null;
+            if ($document->show_amount_in_words) {
+                $amountWordsText = $this->amountInWords->convert(
+                    (float) $document->grand_total,
+                    $document->amount_in_words_locale ?? 'ms_MY',
+                    $document->amount_in_words_currency ?? 'MYR'
+                );
+            }
+
             $document->update([
                 'status' => Document::STATUS_ISSUED,
                 'official_number' => $officialNumber,
@@ -114,6 +125,11 @@ class DocumentWorkflowService
                 'issue_timezone_snapshot' => 'Asia/Kuala_Lumpur',
                 'issuer_snapshot_json' => $company ? $company->only(['name', 'code', 'address', 'phone', 'email', 'registration_number']) : null,
                 'buyer_snapshot_json' => $customer ? $customer->only(['name', 'address', 'phone', 'email', 'tax_identifier']) : null,
+                'bank_snapshot_json' => $company ? $company->only(['name', 'code']) : null,
+                'terms_snapshot_json' => ['terms' => $document->terms],
+                'tax_snapshot_json' => ['tax_total' => $document->tax_total],
+                'currency_fx_snapshot_json' => ['currency' => $document->currency, 'fx_rate' => $document->fx_rate],
+                'amount_in_words_text' => $amountWordsText,
                 'draft_hash' => md5(json_encode($document->items->toArray())),
             ]);
 
@@ -152,6 +168,8 @@ class DocumentWorkflowService
                 'terms' => $overrides['terms'] ?? $source->terms,
                 'converted_from_id' => $source->id,
                 'show_amount_in_words' => $source->show_amount_in_words,
+                'amount_in_words_locale' => $source->amount_in_words_locale,
+                'amount_in_words_currency' => $source->amount_in_words_currency,
             ]);
 
             // Copy items

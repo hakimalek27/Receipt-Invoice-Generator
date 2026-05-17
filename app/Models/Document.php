@@ -31,6 +31,8 @@ class Document extends Model
         'tax_snapshot_json', 'currency_fx_snapshot_json',
         'issue_timezone_snapshot', 'issued_at', 'voided_at',
         'void_reason', 'voided_by',
+        'myinvois_status', 'myinvois_uuid',
+        'myinvois_submission_uid', 'myinvois_validated_at',
     ];
 
     protected $casts = [
@@ -50,6 +52,7 @@ class Document extends Model
         'currency_fx_snapshot_json' => 'array',
         'issued_at' => 'datetime',
         'voided_at' => 'datetime',
+        'myinvois_validated_at' => 'datetime',
     ];
 
     public function company(): BelongsTo
