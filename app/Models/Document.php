@@ -72,6 +72,11 @@ class Document extends Model
         return $this->hasMany(DocumentStatusHistory::class)->orderBy('created_at');
     }
 
+    public function pdfRenders(): HasMany
+    {
+        return $this->hasMany(PdfRender::class);
+    }
+
     public function paymentAllocations()
     {
         return $this->hasMany(PaymentAllocation::class);
