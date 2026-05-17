@@ -18,13 +18,20 @@ class DatabaseSeeder extends Seeder
         'payment_voucher', 'proforma_invoice',
     ];
 
+    private array $typeCodes = [
+        'invoice' => 'INV', 'quotation' => 'Q', 'official_receipt' => 'REC',
+        'delivery_order' => 'DO', 'cash_bill' => 'CB', 'credit_note' => 'CN',
+        'debit_note' => 'DN', 'purchase_order' => 'PO', 'payment_voucher' => 'PV',
+        'proforma_invoice' => 'PI',
+    ];
+
     private function seedPolicies(int $companyId, string $code): void
     {
         foreach ($this->documentTypes as $type) {
             NumberingPolicy::create([
                 'company_id' => $companyId,
                 'document_type' => $type,
-                'prefix' => $code,
+                'prefix' => $code . '-' . $this->typeCodes[$type],
                 'separator' => '-',
                 'year_token' => '{YYYY}',
                 'sequence_padding' => 5,
@@ -36,54 +43,33 @@ class DatabaseSeeder extends Seeder
 
     public function run(): void
     {
-        // Seed canonical companies
         $wehdah = Company::factory()->wehdah()->create();
         $nasCeria = Company::factory()->nasCeria()->create();
         $persada = Company::factory()->persada()->create();
 
-        // Seed numbering policies
         $this->seedPolicies($wehdah->id, 'WS');
         $this->seedPolicies($nasCeria->id, 'NCS');
         $this->seedPolicies($persada->id, 'PGG');
 
-        // Super admin
         User::factory()->create([
-            'name' => 'Super Admin',
-            'email' => 'super@example.com',
-            'role' => 'super_admin',
-            'company_id' => null,
+            'name' => 'Super Admin', 'email' => 'super@example.com',
+            'role' => 'super_admin', 'company_id' => null,
         ]);
-
-        // Wehdah admin
         User::factory()->create([
-            'name' => 'Wehdah Admin',
-            'email' => 'admin@wehdah.test',
-            'role' => 'admin',
-            'company_id' => $wehdah->id,
+            'name' => 'Wehdah Admin', 'email' => 'admin@wehdah.test',
+            'role' => 'admin', 'company_id' => $wehdah->id,
         ]);
-
-        // Wehdah user
         User::factory()->create([
-            'name' => 'Wehdah User',
-            'email' => 'user@wehdah.test',
-            'role' => 'user',
-            'company_id' => $wehdah->id,
+            'name' => 'Wehdah User', 'email' => 'user@wehdah.test',
+            'role' => 'user', 'company_id' => $wehdah->id,
         ]);
-
-        // Nas Ceria admin
         User::factory()->create([
-            'name' => 'NAS Admin',
-            'email' => 'admin@nasceria.test',
-            'role' => 'admin',
-            'company_id' => $nasCeria->id,
+            'name' => 'NAS Admin', 'email' => 'admin@nasceria.test',
+            'role' => 'admin', 'company_id' => $nasCeria->id,
         ]);
-
-        // Persada admin
         User::factory()->create([
-            'name' => 'Persada Admin',
-            'email' => 'admin@persada.test',
-            'role' => 'admin',
-            'company_id' => $persada->id,
+            'name' => 'Persada Admin', 'email' => 'admin@persada.test',
+            'role' => 'admin', 'company_id' => $persada->id,
         ]);
     }
 }

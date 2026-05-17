@@ -101,8 +101,9 @@ class PdfRenderService
     {
         $document->load('items', 'company', 'customer');
 
-        $amountWords = null;
-        if ($document->show_amount_in_words) {
+        // Use snapshotted value for issued documents; recompute only for drafts
+        $amountWords = $document->amount_in_words_text;
+        if (! $amountWords && $document->show_amount_in_words) {
             $amountWords = $this->amountInWords->convert(
                 (float) $document->grand_total,
                 $document->amount_in_words_locale ?? 'ms_MY',

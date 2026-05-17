@@ -26,7 +26,7 @@ class DocumentWorkflowTest extends TestCase
         NumberingPolicy::create([
             'company_id' => $this->company->id,
             'document_type' => 'invoice',
-            'prefix' => 'WS',
+            'prefix' => 'WS-INV',
             'separator' => '-',
             'year_token' => '{YYYY}',
             'sequence_padding' => 5,
@@ -36,7 +36,7 @@ class DocumentWorkflowTest extends TestCase
         NumberingPolicy::create([
             'company_id' => $this->company->id,
             'document_type' => 'quotation',
-            'prefix' => 'WS',
+            'prefix' => 'WS-Q',
             'separator' => '-',
             'year_token' => '{YYYY}',
             'sequence_padding' => 5,
@@ -46,7 +46,7 @@ class DocumentWorkflowTest extends TestCase
         NumberingPolicy::create([
             'company_id' => $this->company->id,
             'document_type' => 'official_receipt',
-            'prefix' => 'WS',
+            'prefix' => 'WS-REC',
             'separator' => '-',
             'year_token' => '{YYYY}',
             'sequence_padding' => 5,
@@ -78,7 +78,7 @@ class DocumentWorkflowTest extends TestCase
         // Issue
         $issued = $this->workflow->issue($draft->id);
         $this->assertEquals(Document::STATUS_ISSUED, $issued->status);
-        $this->assertEquals('WS-2026-00001', $issued->official_number);
+        $this->assertEquals('WS-INV-2026-00001', $issued->official_number);
         $this->assertNotNull($issued->issued_at);
         $this->assertNotNull($issued->issuer_snapshot_json);
     }
@@ -119,7 +119,7 @@ class DocumentWorkflowTest extends TestCase
 
         // Issue the invoice
         $issued = $this->workflow->issue($invoice->id);
-        $this->assertEquals('WS-2026-00001', $issued->official_number);
+        $this->assertEquals('WS-INV-2026-00001', $issued->official_number);
     }
 
     public function test_partial_payment_and_allocation(): void

@@ -49,9 +49,12 @@ class DocumentController extends Controller
             return response()->json(['error' => 'Company scope violation'], 403);
         }
 
-        // Verify draft_hash
+        // Require draft_hash
         $draftHash = $request->input('draft_hash');
-        if ($draftHash && $document->draft_hash !== $draftHash) {
+        if (! $draftHash) {
+            return response()->json(['error' => 'draft_hash required'], 400);
+        }
+        if ($document->draft_hash !== $draftHash) {
             return response()->json(['error' => 'Draft has been modified'], 409);
         }
 

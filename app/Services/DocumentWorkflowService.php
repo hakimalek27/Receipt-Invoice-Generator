@@ -16,6 +16,7 @@ class DocumentWorkflowService
     public function __construct(
         private readonly NumberingService $numbering,
         private readonly AmountInWordsService $amountInWords,
+        private readonly PdfRenderService $pdfRender,
     ) {}
 
     /**
@@ -24,6 +25,27 @@ class DocumentWorkflowService
     public function createDraft(array $data): Document
     {
         return DB::transaction(function () use ($data) {
+            // Cross-company validation
+            $companyId = $data['company_id'];
+            if (! empty($data['customer_id'])) {
+                $customer = Customer::where('id', $data['customer_id'])
+                    ->where('company_id', $companyId)->first();
+                if (! $customer) {
+                    throw new \RuntimeException('Customer does not belong to this company');
+                }
+            }
+            if (! empty($data['items'])) {
+                foreach ($data['items'] as $itemData) {
+                    if (! empty($itemData['product_id'])) {
+                        $product = \App\Models\Product::where('id', $itemData['product_id'])
+                            ->where('company_id', $companyId)->first();
+                        if (! $product) {
+                            throw new \RuntimeException('Product does not belong to this company');
+                        }
+                    }
+                }
+            }
+
             $document = Document::create([
                 'company_id' => $data['company_id'],
                 'document_type' => $data['document_type'],
@@ -139,6 +161,9 @@ class DocumentWorkflowService
                 'to_status' => Document::STATUS_ISSUED,
                 'changed_by_user_id' => $userId,
             ]);
+
+            // Render immutable PDF
+            $this->pdfRender->render($document);
 
             return $document;
         });
@@ -282,6 +307,9 @@ class DocumentWorkflowService
         return DB::transaction(function () use ($payment, $documentId, $amount) {
             $payment->refresh();
 
+            if ($amount <= 0) {
+                throw new \RuntimeException('Allocation amount must be positive');
+            }
             if ($amount > $payment->unallocated_amount) {
                 throw new \RuntimeException(
                     "Allocation amount {$amount} exceeds unallocated {$payment->unallocated_amount}"
