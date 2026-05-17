@@ -1,0 +1,102 @@
+{
+  "meta": {
+    "phase": "R0",
+    "title": "Current State Evidence Freeze",
+    "captured_at": "2026-05-18T00:00:00+08:00",
+    "timezone": "Asia/Kuala_Lumpur",
+    "workspace": "c:\\Projek Coding\\Receipt Invoice Generator",
+    "remediation_branch": "remediation/deepseek-audit-fix",
+    "source_branch": "phase-1-scaffold",
+    "head_commit": "6fa4f76 fix-blockers-numbering-idempotency-pdf-crosscompany-validation"
+  },
+  "git_state": {
+    "status_before_r0_files": "clean",
+    "branch_after_checkout": "remediation/deepseek-audit-fix",
+    "main_remote_state": "origin/main remains at 7dd821a docs(handoff): add Claude audit pack",
+    "implementation_commits_present": [
+      "6fdf7af phase-1-scaffold-complete",
+      "1ae7ee8 phase-2-master-data-numbering",
+      "c2fb4a7 phase-3-document-workflow",
+      "891483b phase-4-pdf-templates",
+      "c723b93 phase-5-api-telegram-ai",
+      "0208f45 phase-6-einvoice-metadata",
+      "6f83a3d phase-7-production-deploy",
+      "da81c69 fix-audit-5-issues",
+      "d56ed60 fix-audit-round2-api-scope-endpoint-tests",
+      "6fa4f76 fix-blockers-numbering-idempotency-pdf-crosscompany-validation"
+    ]
+  },
+  "baseline_verification": {
+    "php_artisan_test": {
+      "result": "passed",
+      "tests": 88,
+      "assertions": 218
+    },
+    "npm_run_build": {
+      "result": "passed",
+      "tool": "vite",
+      "note": "Production client build completed successfully."
+    },
+    "worktree_after_baseline_commands": "clean before R0 evidence files"
+  },
+  "route_surface": {
+    "observed_route_count": 25,
+    "api_routes_present": [
+      "GET api/user",
+      "GET api/documents",
+      "POST api/documents",
+      "GET api/documents/{id}",
+      "POST api/documents/{id}/issue"
+    ],
+    "web_routes_present_summary": [
+      "welcome",
+      "dashboard",
+      "profile",
+      "auth routes"
+    ],
+    "required_routes_missing": [
+      "GET /api/documents/{id}/pdf?version=N&paper=a4|60mm",
+      "PUT/PATCH /api/documents/{id}",
+      "POST /api/documents/{id}/void",
+      "POST /api/documents/{id}/convert",
+      "payment routes",
+      "official receipt routes",
+      "attachment upload/list/delete/reorder routes",
+      "customer CRUD routes",
+      "product CRUD routes",
+      "company profile routes",
+      "template routes",
+      "numbering policy routes",
+      "DeepSeek parse draft endpoint",
+      "Telegram webhook endpoint"
+    ]
+  },
+  "pdf_view_matrix": {
+    "pdf.generic.invoice": true,
+    "pdf.generic.quotation": false,
+    "pdf.generic.official_receipt": false,
+    "pdf.generic.delivery_order": false,
+    "pdf.generic.cash_bill": false,
+    "pdf.wehdah.invoice": true,
+    "pdf.wehdah.quotation": true,
+    "pdf.nasceria.invoice": false,
+    "pdf.nasceria.quotation": false,
+    "pdf.persada.invoice": false,
+    "pdf.thermal_receipt": true
+  },
+  "known_blockers_confirmed": [
+    "Phase 0 and Phase 0.5 gate evidence was missing before this R0 folder.",
+    "Idempotency scoped columns exist but current controller/model do not use them correctly.",
+    "Draft hash is generated from item Eloquent arrays rather than a canonical document payload.",
+    "PDF rendering uses DomPDF while the reference plan requires Playwright/Browsershot/Chromium.",
+    "NAS Ceria and Persada branded templates are missing.",
+    "Generic quotation, official receipt, delivery order, and cash bill PDF views are missing.",
+    "Telegram webhook and real DeepSeek API integration are missing.",
+    "Deployment scripts are placeholder-level and backup path does not match private PDF storage."
+  ],
+  "r0_policy": {
+    "application_behavior_changed": false,
+    "old_excel_imported_as_production": false,
+    "allowed_next_phase": "R1 backend safety only after R0 files validate and commit successfully."
+  }
+}
