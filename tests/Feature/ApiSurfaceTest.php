@@ -183,15 +183,26 @@ class ApiSurfaceTest extends TestCase
     public function test_ai_parse_and_telegram_webhook_routes_exist_and_respond(): void
     {
         Sanctum::actingAs($this->user);
+        config([
+            'services.telegram.webhook_secret' => 'test-secret',
+            'services.telegram.allowed_chat_ids' => '11111',
+            'services.telegram.chat_user_map' => '11111:'.$this->user->id,
+        ]);
 
         $this->postJson('/api/ai/deepseek/parse-draft', [
             'message' => 'Invoice 2x Banner RM100',
         ])->assertOk()
             ->assertJsonPath('company_id', $this->company->id);
 
-        $this->postJson('/api/telegram/webhook', [
-            'message' => ['text' => 'draft invoice'],
-        ])->assertOk()
-            ->assertJsonPath('accepted', true);
+        $this->withHeader('X-Telegram-Bot-Api-Secret-Token', 'test-secret')
+            ->postJson('/api/telegram/webhook', [
+                'message' => [
+                    'chat' => ['id' => 11111],
+                    'from' => ['id' => 22222],
+                    'text' => 'draft invoice 1x Banner RM100',
+                ],
+            ])->assertCreated()
+            ->assertJsonPath('accepted', true)
+            ->assertJsonPath('mode', 'draft_created_confirmation_required');
     }
 }

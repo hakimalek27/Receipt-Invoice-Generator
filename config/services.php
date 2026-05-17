@@ -39,6 +39,8 @@ return [
         'bot_token' => env('TELEGRAM_BOT_TOKEN'),
         'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET'),
         'allowed_chat_ids' => env('TELEGRAM_ALLOWED_CHAT_IDS', ''),
+        'chat_user_map' => env('TELEGRAM_CHAT_USER_MAP', ''),
+        'confirmation_ttl_minutes' => env('TELEGRAM_CONFIRMATION_TTL_MINUTES', 30),
     ],
 
     'deepseek' => [
@@ -46,6 +48,8 @@ return [
         'base_url' => env('DEEPSEEK_BASE_URL', 'https://api.deepseek.com'),
         'model' => env('DEEPSEEK_MODEL', 'deepseek-chat'),
         'timeout' => env('DEEPSEEK_TIMEOUT', 20),
+        'retries' => env('DEEPSEEK_RETRIES', 1),
+        'retention_mode' => env('DEEPSEEK_RETENTION_MODE', 'redacted'),
     ],
 
 ];

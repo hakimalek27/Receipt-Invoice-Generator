@@ -6,11 +6,13 @@ use App\Models\Company;
 use App\Models\Document;
 use App\Models\IdempotencyKey;
 use App\Models\NumberingPolicy;
+use App\Models\TelegramConfirmationToken;
 use App\Models\User;
 use App\Services\DeepSeekParserService;
 use App\Services\DocumentWorkflowService;
 use App\Services\TelegramConfirmationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -22,14 +24,27 @@ class ApiSecurityTest extends TestCase
     protected DeepSeekParserService $aiParser;
     protected TelegramConfirmationService $telegram;
     protected Company $company;
+    protected User $telegramUser;
 
     protected function setUp(): void
     {
         parent::setUp();
+        $this->company = Company::factory()->create(['code' => 'WS']);
+        $this->telegramUser = User::factory()->create([
+            'role' => 'admin',
+            'company_id' => $this->company->id,
+        ]);
+
+        config([
+            'services.telegram.webhook_secret' => 'test-secret',
+            'services.telegram.allowed_chat_ids' => '11111',
+            'services.telegram.chat_user_map' => '11111:'.$this->telegramUser->id,
+            'services.deepseek.api_key' => null,
+        ]);
+
         $this->workflow = app(DocumentWorkflowService::class);
         $this->aiParser = app(DeepSeekParserService::class);
         $this->telegram = app(TelegramConfirmationService::class);
-        $this->company = Company::factory()->create(['code' => 'WS']);
 
         NumberingPolicy::create([
             'company_id' => $this->company->id,
@@ -55,13 +70,21 @@ class ApiSecurityTest extends TestCase
 
     public function test_chat_id_allowlist_enforced(): void
     {
-        $this->assertFalse($this->telegram->isAuthorized('111111111'));
+        $this->assertTrue($this->telegram->isAuthorized('11111'));
         $this->assertFalse($this->telegram->isAuthorized('999999999'));
     }
 
     public function test_webhook_secret_verification_contract(): void
     {
-        $this->assertTrue(true, 'Webhook secret verification contract defined');
+        $this->postJson('/api/telegram/webhook', [
+            'message' => ['chat' => ['id' => 11111], 'text' => 'invoice'],
+        ])->assertForbidden();
+
+        config(['services.telegram.webhook_secret' => null]);
+        $this->withHeader('X-Telegram-Bot-Api-Secret-Token', 'test-secret')
+            ->postJson('/api/telegram/webhook', [
+                'message' => ['chat' => ['id' => 11111], 'text' => 'invoice'],
+            ])->assertStatus(503);
     }
 
     public function test_prompt_injection_treated_as_data(): void
@@ -96,22 +119,28 @@ class ApiSecurityTest extends TestCase
     {
         $draft = $this->createDraft();
         $token = $this->telegram->generateToken(
-            $draft, User::factory()->create(['company_id' => $this->company->id]), '11111'
+            $draft, $this->telegramUser, '11111', '22222'
         );
 
         $this->assertTrue($this->telegram->validateToken($token, $draft->draft_hash));
         $this->assertFalse($this->telegram->validateToken($token, 'changed_hash'));
+        $this->assertNotNull($this->telegram->consumeForIssue($token['token'], '11111', '22222'));
+        $this->assertNull($this->telegram->consumeForIssue($token['token'], '11111', '22222'));
     }
 
     public function test_confirmation_expiry_rejected(): void
     {
         $draft = $this->createDraft();
         $token = $this->telegram->generateToken(
-            $draft, User::factory()->create(['company_id' => $this->company->id]), '11111'
+            $draft, $this->telegramUser, '11111', '22222'
         );
 
         $token['expires_at'] = now()->subMinute()->toIso8601String();
         $this->assertFalse($this->telegram->validateToken($token, $draft->draft_hash));
+
+        TelegramConfirmationToken::where('token_hash', $this->telegram->hashToken($token['token']))
+            ->update(['expires_at' => now()->subMinute()]);
+        $this->assertNull($this->telegram->consumeForIssue($token['token'], '11111', '22222'));
     }
 
     public function test_cross_company_telegram_access_rejected(): void
@@ -119,11 +148,12 @@ class ApiSecurityTest extends TestCase
         $otherCompany = Company::factory()->create(['code' => 'PGG']);
         $draft = $this->createDraft();
         $token = $this->telegram->generateToken(
-            $draft, User::factory()->create(['company_id' => $this->company->id]), '11111'
+            $draft, $this->telegramUser, '11111', '22222'
         );
 
         $this->assertEquals($this->company->id, $token['company_id']);
         $this->assertNotEquals($otherCompany->id, $token['company_id']);
+        $this->assertNull($this->telegram->consumeForIssue($token['token'], '99999', '22222'));
     }
 
     public function test_deepseek_outage_fallback_to_manual(): void
@@ -131,6 +161,142 @@ class ApiSecurityTest extends TestCase
         $result = $this->aiParser->parseIntent('2x Banner 3x2ft RM150', $this->company->id);
         $this->assertArrayNotHasKey('error', $result);
         $this->assertNotEmpty($result['items']);
+        $this->assertEquals('fallback_regex', $result['ai_status']);
+    }
+
+    public function test_telegram_webhook_rejects_unauthorized_chat(): void
+    {
+        $this->withHeader('X-Telegram-Bot-Api-Secret-Token', 'test-secret')
+            ->postJson('/api/telegram/webhook', [
+                'message' => [
+                    'chat' => ['id' => 99999],
+                    'from' => ['id' => 22222],
+                    'text' => 'invoice 1x Banner RM100',
+                ],
+            ])->assertForbidden()
+            ->assertJson(['error' => 'Unauthorized Telegram chat']);
+    }
+
+    public function test_telegram_webhook_creates_draft_only_until_confirmation(): void
+    {
+        $response = $this->withHeader('X-Telegram-Bot-Api-Secret-Token', 'test-secret')
+            ->postJson('/api/telegram/webhook', [
+                'message' => [
+                    'chat' => ['id' => 11111],
+                    'from' => ['id' => 22222],
+                    'text' => 'invoice 1x Banner RM100',
+                ],
+            ])->assertCreated()
+            ->assertJsonPath('mode', 'draft_created_confirmation_required');
+
+        $document = Document::findOrFail($response->json('document_id'));
+        $this->assertTrue($document->isDraft());
+        $this->assertNull($document->official_number);
+        $this->assertNotEmpty($response->json('confirmation_token'));
+        $this->assertEquals(1, TelegramConfirmationToken::count());
+    }
+
+    public function test_telegram_confirmation_issues_once_and_replay_is_rejected(): void
+    {
+        $draftResponse = $this->withHeader('X-Telegram-Bot-Api-Secret-Token', 'test-secret')
+            ->postJson('/api/telegram/webhook', [
+                'message' => [
+                    'chat' => ['id' => 11111],
+                    'from' => ['id' => 22222],
+                    'text' => 'invoice 1x Banner RM100',
+                ],
+            ])->assertCreated();
+
+        $token = $draftResponse->json('confirmation_token');
+
+        $this->withHeader('X-Telegram-Bot-Api-Secret-Token', 'test-secret')
+            ->postJson('/api/telegram/webhook', [
+                'message' => [
+                    'chat' => ['id' => 11111],
+                    'from' => ['id' => 22222],
+                    'text' => '/confirm '.$token,
+                ],
+            ])->assertOk()
+            ->assertJsonPath('status', Document::STATUS_ISSUED);
+
+        $this->withHeader('X-Telegram-Bot-Api-Secret-Token', 'test-secret')
+            ->postJson('/api/telegram/webhook', [
+                'message' => [
+                    'chat' => ['id' => 11111],
+                    'from' => ['id' => 22222],
+                    'text' => '/confirm '.$token,
+                ],
+            ])->assertStatus(409);
+    }
+
+    public function test_telegram_confirmation_rejects_changed_draft_hash(): void
+    {
+        $draftResponse = $this->withHeader('X-Telegram-Bot-Api-Secret-Token', 'test-secret')
+            ->postJson('/api/telegram/webhook', [
+                'message' => [
+                    'chat' => ['id' => 11111],
+                    'from' => ['id' => 22222],
+                    'text' => 'invoice 1x Banner RM100',
+                ],
+            ])->assertCreated();
+
+        Document::findOrFail($draftResponse->json('document_id'))->update(['draft_hash' => str_repeat('a', 64)]);
+
+        $this->withHeader('X-Telegram-Bot-Api-Secret-Token', 'test-secret')
+            ->postJson('/api/telegram/webhook', [
+                'message' => [
+                    'chat' => ['id' => 11111],
+                    'from' => ['id' => 22222],
+                    'text' => '/confirm '.$draftResponse->json('confirmation_token'),
+                ],
+            ])->assertStatus(409);
+
+        $this->assertTrue(Document::findOrFail($draftResponse->json('document_id'))->isDraft());
+    }
+
+    public function test_deepseek_malformed_api_output_falls_back_to_manual(): void
+    {
+        config(['services.deepseek.api_key' => 'test-key']);
+        Http::fake([
+            'https://api.deepseek.com/*' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => 'not json']],
+                ],
+            ]),
+        ]);
+
+        $result = app(DeepSeekParserService::class)->parseIntent('1x Sticker RM25', $this->company->id);
+
+        $this->assertEquals('fallback_regex', $result['ai_status']);
+        $this->assertEquals($this->company->id, $result['company_id']);
+        $this->assertNotEmpty($result['items']);
+    }
+
+    public function test_deepseek_valid_api_output_is_used_without_forbidden_fields(): void
+    {
+        config(['services.deepseek.api_key' => 'test-key']);
+        Http::fake([
+            'https://api.deepseek.com/*' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => json_encode([
+                        'document_type' => 'quotation',
+                        'customer_name' => '<b>Customer A</b>',
+                        'items' => [
+                            ['description' => '<script>x</script>Banner', 'quantity' => 2, 'unit_price' => 100],
+                        ],
+                        'notes' => 'Valid 14 days',
+                    ])]],
+                ],
+            ]),
+        ]);
+
+        $result = app(DeepSeekParserService::class)->parseIntent('quotation', $this->company->id);
+
+        $this->assertEquals('deepseek', $result['ai_status']);
+        $this->assertEquals('quotation', $result['document_type']);
+        $this->assertEquals('Customer A', $result['customer_name']);
+        $this->assertEquals('xBanner', $result['items'][0]['description']);
+        $this->assertArrayNotHasKey('official_number', $result);
     }
 
     public function test_api_idempotency_double_submit_safe(): void
