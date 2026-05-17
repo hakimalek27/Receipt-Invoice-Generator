@@ -2,25 +2,25 @@
 
 namespace App\Models;
 
-use Database\Factories\CustomerFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-/** @use HasFactory<CustomerFactory> */
-class Customer extends Model
+class Payment extends Model
 {
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'company_id', 'name', 'attention_to', 'address', 'address_line_2',
-        'city', 'state', 'postcode', 'country', 'phone', 'email',
-        'tax_identifier', 'is_active', 'metadata',
+        'company_id', 'payment_date', 'amount', 'unallocated_amount',
+        'method', 'reference_number', 'notes', 'metadata',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
+        'payment_date' => 'date',
+        'amount' => 'decimal:2',
+        'unallocated_amount' => 'decimal:2',
         'metadata' => 'array',
     ];
 
@@ -29,9 +29,9 @@ class Customer extends Model
         return $this->belongsTo(Company::class);
     }
 
-    public function scopeActive($query)
+    public function allocations(): HasMany
     {
-        return $query->where('is_active', true);
+        return $this->hasMany(PaymentAllocation::class);
     }
 
     public function scopeForCompany($query, $companyId)
