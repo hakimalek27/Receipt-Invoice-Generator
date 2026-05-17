@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('idempotency_keys', function (Blueprint $table) {
             $table->id();
-            $table->string('key', 64)->unique();
+            $table->string('key', 128);
             $table->string('resource_type')->nullable();
             $table->unsignedBigInteger('resource_id')->nullable();
             $table->jsonb('response_data')->nullable();

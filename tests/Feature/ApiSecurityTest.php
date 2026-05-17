@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Company;
 use App\Models\Document;
+use App\Models\IdempotencyKey;
 use App\Models\NumberingPolicy;
 use App\Models\User;
 use App\Services\DeepSeekParserService;
@@ -141,7 +142,7 @@ class ApiSecurityTest extends TestCase
         Sanctum::actingAs($user);
 
         $headers = ['Idempotency-Key' => 'test-key-001'];
-        $body = ['draft_hash' => $draft->draft_hash];
+        $body = ['draft_hash' => $draft->draft_hash, 'confirmed_total' => $draft->grand_total];
 
         $r1 = $this->postJson("/api/documents/{$draft->id}/issue", $body, $headers);
         $r1->assertStatus(200);
@@ -150,6 +151,78 @@ class ApiSecurityTest extends TestCase
         $r2->assertStatus(200);
 
         $this->assertEquals($r1->json('official_number'), $r2->json('official_number'));
+    }
+
+    public function test_issue_requires_confirmed_total(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'admin', 'company_id' => $this->company->id,
+        ]);
+        $draft = $this->createDraft();
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson("/api/documents/{$draft->id}/issue", [
+            'draft_hash' => $draft->draft_hash,
+        ], ['Idempotency-Key' => 'missing-total']);
+
+        $response->assertStatus(400)
+            ->assertJson(['error' => 'confirmed_total required']);
+    }
+
+    public function test_issue_idempotency_rejects_same_key_with_different_request(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'admin', 'company_id' => $this->company->id,
+        ]);
+        $draft = $this->createDraft();
+        Sanctum::actingAs($user);
+
+        $headers = ['Idempotency-Key' => 'same-key-different-request'];
+        $body = ['draft_hash' => $draft->draft_hash, 'confirmed_total' => $draft->grand_total];
+
+        $this->postJson("/api/documents/{$draft->id}/issue", $body, $headers)
+            ->assertStatus(200);
+
+        $this->postJson("/api/documents/{$draft->id}/issue", [
+            'draft_hash' => $draft->draft_hash,
+            'confirmed_total' => 999,
+        ], $headers)->assertStatus(409)
+            ->assertJson(['error' => 'Idempotency-Key reused with different request']);
+    }
+
+    public function test_same_idempotency_key_is_scoped_by_company_and_user(): void
+    {
+        $otherCompany = Company::factory()->create(['code' => 'PGG']);
+        NumberingPolicy::create([
+            'company_id' => $otherCompany->id,
+            'document_type' => 'invoice',
+            'prefix' => 'PGG', 'separator' => '-', 'year_token' => '{YYYY}',
+            'sequence_padding' => 5, 'reset_policy' => 'yearly', 'is_active' => true,
+        ]);
+
+        $userA = User::factory()->create(['role' => 'admin', 'company_id' => $this->company->id]);
+        $userB = User::factory()->create(['role' => 'admin', 'company_id' => $otherCompany->id]);
+
+        $draftA = $this->createDraft();
+        $draftB = $this->workflow->createDraft([
+            'company_id' => $otherCompany->id,
+            'document_type' => 'invoice',
+            'items' => [['description' => 'Other', 'quantity' => 1, 'unit_price' => 50]],
+        ]);
+
+        Sanctum::actingAs($userA);
+        $this->postJson("/api/documents/{$draftA->id}/issue", [
+            'draft_hash' => $draftA->draft_hash,
+            'confirmed_total' => $draftA->grand_total,
+        ], ['Idempotency-Key' => 'shared-key'])->assertStatus(200);
+
+        Sanctum::actingAs($userB);
+        $this->postJson("/api/documents/{$draftB->id}/issue", [
+            'draft_hash' => $draftB->draft_hash,
+            'confirmed_total' => $draftB->grand_total,
+        ], ['Idempotency-Key' => 'shared-key'])->assertStatus(200);
+
+        $this->assertEquals(2, IdempotencyKey::where('key', 'shared-key')->count());
     }
 
     public function test_ai_never_chooses_company(): void

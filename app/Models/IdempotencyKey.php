@@ -10,7 +10,9 @@ class IdempotencyKey extends Model
     use HasFactory;
 
     protected $fillable = [
-        'key', 'resource_type', 'resource_id', 'response_data', 'expires_at',
+        'company_id', 'user_id', 'key', 'resource_type', 'resource_id',
+        'document_id', 'draft_hash', 'request_hash', 'status',
+        'response_data', 'expires_at',
     ];
 
     protected $casts = [

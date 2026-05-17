@@ -13,7 +13,7 @@ return new class extends Migration
             $table->foreignId('company_id')->constrained()->cascadeOnDelete();
             $table->string('document_type', 50);
             $table->string('status', 20)->default('draft');
-            $table->string('official_number')->nullable()->unique();
+            $table->string('official_number')->nullable();
             $table->foreignId('customer_id')->nullable()->constrained()->nullOnDelete();
             $table->date('document_date')->nullable();
             $table->date('due_date')->nullable();
@@ -49,6 +49,10 @@ return new class extends Migration
 
             $table->index(['company_id', 'document_type', 'status']);
             $table->index(['company_id', 'customer_id']);
+            $table->unique(
+                ['company_id', 'document_type', 'official_number'],
+                'documents_unique_official_number_per_company_type'
+            );
         });
     }
 

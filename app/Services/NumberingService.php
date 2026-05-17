@@ -30,23 +30,25 @@ class NumberingService
         }
 
         return DB::transaction(function () use ($companyId, $documentType, $year, $policy) {
+            SequenceCounter::query()->upsert([
+                [
+                    'company_id' => $companyId,
+                    'document_type' => $documentType,
+                    'year' => $year,
+                    'current_sequence' => 0,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ],
+            ], ['company_id', 'document_type', 'year'], ['updated_at']);
+
             $counter = SequenceCounter::where('company_id', $companyId)
                 ->where('document_type', $documentType)
                 ->where('year', $year)
                 ->lockForUpdate()
-                ->first();
+                ->firstOrFail();
 
-            if (! $counter) {
-                $counter = SequenceCounter::create([
-                    'company_id' => $companyId,
-                    'document_type' => $documentType,
-                    'year' => $year,
-                    'current_sequence' => 1,
-                ]);
-            } else {
-                $counter->increment('current_sequence');
-                $counter->refresh();
-            }
+            $counter->increment('current_sequence');
+            $counter->refresh();
 
             return $this->format($policy, $counter->current_sequence, $year);
         });

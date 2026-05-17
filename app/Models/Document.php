@@ -132,7 +132,9 @@ class Document extends Model
 
     public function recomputeTotals(): void
     {
-        $this->subtotal = $this->items->sum('line_total');
+        $this->subtotal = $this->items->sum(
+            fn (DocumentItem $item) => round((float) $item->quantity * (float) $item->unit_price, 2)
+        );
         $this->discount_total = $this->items->sum('discount');
         $this->tax_total = $this->items->sum('tax_amount');
         $this->grand_total = $this->subtotal - $this->discount_total + $this->tax_total;

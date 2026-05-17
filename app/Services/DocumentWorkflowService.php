@@ -17,6 +17,7 @@ class DocumentWorkflowService
         private readonly NumberingService $numbering,
         private readonly AmountInWordsService $amountInWords,
         private readonly PdfRenderService $pdfRender,
+        private readonly DocumentFingerprintService $fingerprint,
     ) {}
 
     /**
@@ -54,6 +55,7 @@ class DocumentWorkflowService
                 'document_date' => $data['document_date'] ?? now()->toDateString(),
                 'due_date' => $data['due_date'] ?? null,
                 'currency' => $data['currency'] ?? 'MYR',
+                'fx_rate' => $data['fx_rate'] ?? null,
                 'notes' => $data['notes'] ?? null,
                 'terms' => $data['terms'] ?? null,
                 'show_amount_in_words' => $data['show_amount_in_words'] ?? false,
@@ -64,30 +66,14 @@ class DocumentWorkflowService
             // Create items
             if (! empty($data['items'])) {
                 foreach ($data['items'] as $i => $itemData) {
-                    $lineTotal = ($itemData['quantity'] ?? 1) * ($itemData['unit_price'] ?? 0)
-                        - ($itemData['discount'] ?? 0);
-                    DocumentItem::create([
-                        'document_id' => $document->id,
-                        'product_id' => $itemData['product_id'] ?? null,
-                        'description' => $itemData['description'],
-                        'quantity' => $itemData['quantity'] ?? 1,
-                        'uom' => $itemData['uom'] ?? 'unit',
-                        'unit_price' => $itemData['unit_price'] ?? 0,
-                        'discount' => $itemData['discount'] ?? 0,
-                        'line_total' => $lineTotal,
-                        'tax_type' => $itemData['tax_type'] ?? null,
-                        'tax_rate' => $itemData['tax_rate'] ?? null,
-                        'tax_amount' => $itemData['tax_amount'] ?? 0,
-                        'classification_code' => $itemData['classification_code'] ?? null,
-                        'tax_exemption_reason' => $itemData['tax_exemption_reason'] ?? null,
-                        'sort_order' => $itemData['sort_order'] ?? $i,
-                    ]);
+                    DocumentItem::create($this->itemPayload($document->id, $itemData, $i));
                 }
             }
 
             $document->load('items');
             $document->recomputeTotals();
-            $document->draft_hash = md5(json_encode($document->items->toArray()));
+            $document->save();
+            $document->draft_hash = $this->fingerprint->hash($document);
             $document->save();
 
             DocumentStatusHistory::create([
@@ -103,9 +89,14 @@ class DocumentWorkflowService
     /**
      * Issue a draft document. Allocates official number and snapshots.
      */
-    public function issue(int $documentId, ?int $userId = null): Document
+    public function issue(
+        int $documentId,
+        ?int $userId = null,
+        ?string $expectedDraftHash = null,
+        ?float $confirmedTotal = null
+    ): Document
     {
-        return DB::transaction(function () use ($documentId, $userId) {
+        return DB::transaction(function () use ($documentId, $userId, $expectedDraftHash, $confirmedTotal) {
             $document = Document::lockForUpdate()->findOrFail($documentId);
 
             if (! $document->isDraft()) {
@@ -125,6 +116,16 @@ class DocumentWorkflowService
             // Recompute totals for safety
             $document->load('items');
             $document->recomputeTotals();
+            $document->save();
+            $currentDraftHash = $this->fingerprint->hash($document);
+
+            if ($expectedDraftHash !== null && ! hash_equals($currentDraftHash, $expectedDraftHash)) {
+                throw new \RuntimeException('Draft has been modified');
+            }
+
+            if ($confirmedTotal !== null && round((float) $confirmedTotal, 2) !== round((float) $document->grand_total, 2)) {
+                throw new \RuntimeException('Total mismatch');
+            }
 
             // Take issue-time snapshots
             $company = Company::find($document->company_id);
@@ -152,7 +153,7 @@ class DocumentWorkflowService
                 'tax_snapshot_json' => ['tax_total' => $document->tax_total],
                 'currency_fx_snapshot_json' => ['currency' => $document->currency, 'fx_rate' => $document->fx_rate],
                 'amount_in_words_text' => $amountWordsText,
-                'draft_hash' => md5(json_encode($document->items->toArray())),
+                'draft_hash' => $currentDraftHash,
             ]);
 
             DocumentStatusHistory::create([
@@ -199,21 +200,27 @@ class DocumentWorkflowService
 
             // Copy items
             foreach ($source->items as $i => $item) {
-                DocumentItem::create([
-                    'document_id' => $target->id,
+                $override = $overrides['items'][$i] ?? [];
+                DocumentItem::create($this->itemPayload($target->id, [
                     'product_id' => $item->product_id,
-                    'description' => $overrides['items'][$i]['description'] ?? $item->description,
-                    'quantity' => $overrides['items'][$i]['quantity'] ?? $item->quantity,
-                    'uom' => $item->uom,
-                    'unit_price' => $overrides['items'][$i]['unit_price'] ?? $item->unit_price,
-                    'discount' => $overrides['items'][$i]['discount'] ?? $item->discount,
-                    'line_total' => 0, // recomputed below
+                    'description' => $override['description'] ?? $item->description,
+                    'quantity' => $override['quantity'] ?? $item->quantity,
+                    'uom' => $override['uom'] ?? $item->uom,
+                    'unit_price' => $override['unit_price'] ?? $item->unit_price,
+                    'discount' => $override['discount'] ?? $item->discount,
+                    'tax_type' => $override['tax_type'] ?? $item->tax_type,
+                    'tax_rate' => $override['tax_rate'] ?? $item->tax_rate,
+                    'tax_amount' => $override['tax_amount'] ?? $item->tax_amount,
+                    'classification_code' => $override['classification_code'] ?? $item->classification_code,
+                    'tax_exemption_reason' => $override['tax_exemption_reason'] ?? $item->tax_exemption_reason,
                     'sort_order' => $i,
-                ]);
+                ], $i));
             }
 
             $target->load('items');
             $target->recomputeTotals();
+            $target->save();
+            $target->draft_hash = $this->fingerprint->hash($target);
             $target->save();
 
             // Mark source as converted if it was issued
@@ -346,5 +353,30 @@ class DocumentWorkflowService
         $currentIssuer = $company->only(['name', 'code', 'address', 'phone', 'email', 'registration_number']);
 
         return $document->issuer_snapshot_json === $currentIssuer;
+    }
+
+    private function itemPayload(int $documentId, array $itemData, int $index): array
+    {
+        $quantity = (float) ($itemData['quantity'] ?? 1);
+        $unitPrice = (float) ($itemData['unit_price'] ?? 0);
+        $discount = (float) ($itemData['discount'] ?? 0);
+        $lineTotal = round(max(0, ($quantity * $unitPrice) - $discount), 2);
+
+        return [
+            'document_id' => $documentId,
+            'product_id' => $itemData['product_id'] ?? null,
+            'description' => $itemData['description'],
+            'quantity' => $quantity,
+            'uom' => $itemData['uom'] ?? 'unit',
+            'unit_price' => $unitPrice,
+            'discount' => $discount,
+            'line_total' => $lineTotal,
+            'tax_type' => $itemData['tax_type'] ?? null,
+            'tax_rate' => $itemData['tax_rate'] ?? null,
+            'tax_amount' => $itemData['tax_amount'] ?? 0,
+            'classification_code' => $itemData['classification_code'] ?? null,
+            'tax_exemption_reason' => $itemData['tax_exemption_reason'] ?? null,
+            'sort_order' => $itemData['sort_order'] ?? $index,
+        ];
     }
 }

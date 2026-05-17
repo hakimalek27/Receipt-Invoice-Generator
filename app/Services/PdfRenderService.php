@@ -33,9 +33,10 @@ class PdfRenderService
 
         $version = ($document->pdfRenders()->max('version') ?? 0) + 1;
         $filename = "documents/{$document->company_id}/{$document->id}_v{$version}.pdf";
+        $pdfBytes = $pdf->output();
 
         // Store in private storage
-        Storage::disk('local')->put($filename, $pdf->output());
+        Storage::disk('local')->put($filename, $pdfBytes);
 
         // Mark previous versions as not current
         $document->pdfRenders()->update(['is_current' => false]);
@@ -44,8 +45,8 @@ class PdfRenderService
             'document_id' => $document->id,
             'version' => $version,
             'file_path' => $filename,
-            'file_size' => Storage::disk('local')->size($filename),
-            'sha256' => hash_file('sha256', Storage::disk('local')->path($filename)),
+            'file_size' => strlen($pdfBytes),
+            'sha256' => hash('sha256', $pdfBytes),
             'page_count' => $pdf->getDomPDF()->getCanvas()->get_page_number(),
             'paper_size' => $paperSize ?? 'A4',
             'template_used' => $template,

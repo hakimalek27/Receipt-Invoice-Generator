@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\Customer;
 use App\Models\Document;
 use App\Models\NumberingPolicy;
+use App\Services\DocumentFingerprintService;
 use App\Services\DocumentWorkflowService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -244,9 +245,73 @@ class DocumentWorkflowTest extends TestCase
         ]);
 
         // X: 2*100 = 200, Y: 1*50 - 10 = 40
-        $this->assertEquals(240, (float) $draft->subtotal);
+        $this->assertEquals(250, (float) $draft->subtotal);
         $this->assertEquals(10, (float) $draft->discount_total);
-        $this->assertEquals(230, (float) $draft->grand_total);
+        $this->assertEquals(240, (float) $draft->grand_total);
+        $this->assertEquals([200.0, 40.0], $draft->items->pluck('line_total')->map(fn ($v) => (float) $v)->all());
+    }
+
+    public function test_conversion_preserves_totals_and_line_metadata(): void
+    {
+        $quotation = $this->workflow->createDraft([
+            'company_id' => $this->company->id,
+            'document_type' => 'quotation',
+            'items' => [
+                [
+                    'description' => 'Taxable item',
+                    'quantity' => 2,
+                    'unit_price' => 100,
+                    'discount' => 15,
+                    'tax_type' => 'SST',
+                    'tax_rate' => 6,
+                    'tax_amount' => 11.10,
+                    'classification_code' => '022',
+                    'tax_exemption_reason' => 'N/A',
+                ],
+            ],
+        ]);
+
+        $invoice = $this->workflow->convert($quotation->id, 'invoice');
+        $item = $invoice->items->first();
+
+        $this->assertEquals(200, (float) $invoice->subtotal);
+        $this->assertEquals(15, (float) $invoice->discount_total);
+        $this->assertEquals(11.10, (float) $invoice->tax_total);
+        $this->assertEquals(196.10, (float) $invoice->grand_total);
+        $this->assertEquals(185, (float) $item->line_total);
+        $this->assertEquals('022', $item->classification_code);
+        $this->assertNotNull($invoice->draft_hash);
+    }
+
+    public function test_canonical_draft_hash_changes_when_document_payload_changes(): void
+    {
+        $draft = $this->workflow->createDraft([
+            'company_id' => $this->company->id,
+            'document_type' => 'invoice',
+            'terms' => 'Original terms',
+            'items' => $this->createDraftItems(),
+        ]);
+
+        $originalHash = $draft->draft_hash;
+        $draft->update(['terms' => 'Changed terms']);
+
+        $this->assertNotEquals($originalHash, app(DocumentFingerprintService::class)->hash($draft->fresh('items')));
+    }
+
+    public function test_issue_rejects_stale_draft_hash_inside_transaction(): void
+    {
+        $draft = $this->workflow->createDraft([
+            'company_id' => $this->company->id,
+            'document_type' => 'invoice',
+            'items' => [['description' => 'X', 'quantity' => 1, 'unit_price' => 100]],
+        ]);
+
+        $staleHash = $draft->draft_hash;
+        $draft->items->first()->update(['unit_price' => 200, 'line_total' => 200]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Draft has been modified');
+        $this->workflow->issue($draft->id, null, $staleHash, 100);
     }
 
     public function test_cross_company_payment_allocation_rejected(): void
@@ -341,6 +406,7 @@ class DocumentWorkflowTest extends TestCase
         // Issue via API
         $issueResponse = $this->postJson("/api/documents/{$draftId}/issue", [
             'draft_hash' => $response->json('draft_hash'),
+            'confirmed_total' => $response->json('grand_total'),
         ], ['Idempotency-Key' => 'api-test-key']);
 
         $issueResponse->assertStatus(200);

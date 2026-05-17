@@ -14,8 +14,13 @@ return new class extends Migration
             $table->unsignedBigInteger('document_id')->nullable()->after('resource_id');
             $table->string('draft_hash', 64)->nullable()->after('document_id');
             $table->string('request_hash', 64)->nullable()->after('draft_hash');
+            $table->string('status', 20)->default('processing')->after('request_hash');
 
             $table->index(['company_id', 'key']);
+            $table->unique(
+                ['company_id', 'user_id', 'document_id', 'resource_type', 'key'],
+                'idempotency_unique_scoped_action_key'
+            );
         });
     }
 
@@ -24,7 +29,8 @@ return new class extends Migration
         Schema::table('idempotency_keys', function (Blueprint $table) {
             $table->dropForeign(['company_id']);
             $table->dropForeign(['user_id']);
-            $table->dropColumn(['company_id', 'user_id', 'document_id', 'draft_hash', 'request_hash']);
+            $table->dropUnique('idempotency_unique_scoped_action_key');
+            $table->dropColumn(['company_id', 'user_id', 'document_id', 'draft_hash', 'request_hash', 'status']);
         });
     }
 };
