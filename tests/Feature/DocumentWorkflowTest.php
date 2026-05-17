@@ -287,4 +287,63 @@ class DocumentWorkflowTest extends TestCase
         $this->workflow->void($issued->id, 'Done');
         $this->assertCount(3, $issued->fresh()->statusHistory);
     }
+
+    public function test_amount_in_words_snapshotted_at_issue(): void
+    {
+        $draft = $this->workflow->createDraft([
+            'company_id' => $this->company->id,
+            'document_type' => 'invoice',
+            'show_amount_in_words' => true,
+            'amount_in_words_locale' => 'ms_MY',
+            'items' => [['description' => 'X', 'quantity' => 2, 'unit_price' => 50]],
+        ]);
+
+        $this->assertNull($draft->amount_in_words_text);
+
+        $issued = $this->workflow->issue($draft->id);
+        $this->assertNotNull($issued->amount_in_words_text);
+        $this->assertStringContainsString('RINGGIT MALAYSIA', $issued->amount_in_words_text);
+        $this->assertStringContainsString('SERATUS', $issued->amount_in_words_text);
+    }
+
+    public function test_amount_in_words_not_generated_when_disabled(): void
+    {
+        $draft = $this->workflow->createDraft([
+            'company_id' => $this->company->id,
+            'document_type' => 'invoice',
+            'show_amount_in_words' => false,
+            'items' => [['description' => 'X', 'quantity' => 1, 'unit_price' => 100]],
+        ]);
+
+        $issued = $this->workflow->issue($draft->id);
+        $this->assertNull($issued->amount_in_words_text);
+    }
+
+    public function test_api_create_draft_and_issue(): void
+    {
+        $user = \App\Models\User::factory()->create([
+            'role' => 'admin', 'company_id' => $this->company->id,
+        ]);
+        \Laravel\Sanctum\Sanctum::actingAs($user);
+
+        // Create draft via API
+        $response = $this->postJson('/api/documents', [
+            'document_type' => 'invoice',
+            'items' => [
+                ['description' => 'API Item', 'quantity' => 2, 'unit_price' => 75],
+            ],
+        ]);
+
+        $response->assertStatus(201);
+        $draftId = $response->json('id');
+        $this->assertEquals(150, (float) $response->json('grand_total'));
+
+        // Issue via API
+        $issueResponse = $this->postJson("/api/documents/{$draftId}/issue", [
+            'draft_hash' => $response->json('draft_hash'),
+        ], ['Idempotency-Key' => 'api-test-key']);
+
+        $issueResponse->assertStatus(200);
+        $this->assertNotNull($issueResponse->json('official_number'));
+    }
 }

@@ -86,6 +86,35 @@ class DocumentController extends Controller
     }
 
     /**
+     * Create a draft document.
+     */
+    public function store(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $data = $request->validate([
+            'document_type' => 'required|string',
+            'customer_id' => 'nullable|exists:customers,id',
+            'document_date' => 'nullable|date',
+            'due_date' => 'nullable|date',
+            'currency' => 'nullable|string|size:3',
+            'notes' => 'nullable|string',
+            'terms' => 'nullable|string',
+            'show_amount_in_words' => 'nullable|boolean',
+            'amount_in_words_locale' => 'nullable|string',
+            'items' => 'nullable|array',
+            'items.*.description' => 'required|string',
+            'items.*.quantity' => 'nullable|numeric|min:0',
+            'items.*.unit_price' => 'nullable|numeric|min:0',
+            'items.*.discount' => 'nullable|numeric|min:0',
+        ]);
+
+        $data['company_id'] = $request->user()->company_id;
+
+        $draft = $this->workflow->createDraft($data);
+
+        return response()->json($draft->load('items'), 201);
+    }
+
+    /**
      * List documents for the authenticated user's company.
      */
     public function index(Request $request): \Illuminate\Http\JsonResponse
