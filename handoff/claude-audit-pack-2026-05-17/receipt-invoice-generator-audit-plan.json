@@ -1,0 +1,1124 @@
+{
+  "meta": {
+    "title": "Receipt Invoice Generator Claude Audit Pack",
+    "created_at": "2026-05-17T18:26:42+08:00",
+    "created_for": "Claude audit and improvement pass before implementation",
+    "bundle_root": "c:\\Projek Coding\\Receipt Invoice Generator\\handoff\\claude-audit-pack-2026-05-17",
+    "language_context": [
+      "Malay",
+      "English"
+    ],
+    "status": "handoff_ready",
+    "important_note": "This pack is for audit and implementation planning. It intentionally does not create the production app yet."
+  },
+  "audit_instruction_for_claude": {
+    "primary_task": "Audit this plan deeply, identify gaps, risks, missing requirements, and propose improvements without changing locked user decisions unless justified.",
+    "must_read_first": [
+      "receipt-invoice-generator-audit-plan.json",
+      "analysis/workbook-audit-summary.json",
+      "reference-manifest.json",
+      "README_FOR_CLAUDE.md"
+    ],
+    "audit_angles": [
+      "Check whether document scope is sufficient for Malaysia SME and global use.",
+      "Check whether data model supports invoice, quotation, DO, receipt, payment, refund, credit note, debit note, purchase order, cash bill, and voucher workflows.",
+      "Check whether numbering policy is collision-safe and strictly per company and per document type.",
+      "Check whether PDF renderer approach can match Excel-style templates while keeping maintainable HTML/CSS templates.",
+      "Check whether Telegram plus DeepSeek workflow is safe and cannot bypass user confirmation.",
+      "Check whether e-Invoice metadata is enough for later MyInvois integration.",
+      "Check whether Tencent Ubuntu deployment is secure, maintainable, backed up, and observable.",
+      "Check whether template audit separated canonical company formats from mixed sample sheets correctly."
+    ],
+    "expected_output_from_claude": [
+      "A revised plan with clear improvements and no ambiguity for implementers.",
+      "A risk register with severity and mitigation.",
+      "A missing-info checklist grouped by company and workflow.",
+      "Recommended implementation phase ordering and acceptance gates.",
+      "Any proposed schema or API changes that reduce future rework."
+    ],
+    "do_not_do": [
+      "Do not treat historical Excel records as production imports.",
+      "Do not merge company numbering or template identity.",
+      "Do not redesign all document templates unless user later asks.",
+      "Do not require full MyInvois submission in v1."
+    ]
+  },
+  "locked_user_decisions": {
+    "historical_excel_policy": "Template reference only, not imported as production records.",
+    "document_design_policy": "Match plus kemas: preserve original design identity while improving spacing, typos, table consistency, and polish.",
+    "company_isolation": "Every company has separate profile, templates, records, numbering, and sequences.",
+    "numbering_issue_rule": "Official numbers are generated only when a document is issued, not while it is a draft.",
+    "einvoice_v1_scope": "Metadata-ready only. MyInvois submission/signing/cancel/reject is not part of v1.",
+    "no_cross_company_numbering": "Wehdah, Persada, Virtue Damsel, and Nas Ceria numbering must never share one sequence.",
+    "workspace_state": "Current workspace is empty, so build a new system rather than refactor an existing app."
+  },
+  "project_goal": {
+    "summary": "Build a premium multi-company receipt, invoice, delivery order, quotation, and related business document generator to replace messy Excel workflows.",
+    "business_problem": [
+      "Excel files are saved across different PCs, causing scattered records and inconsistent document numbers.",
+      "Invoice, quotation, receipt, DO, and artwork references are hard to search and verify.",
+      "Multiple companies require independent formats and independent numbering."
+    ],
+    "success_definition": [
+      "User can choose company, document type, customer, items, payment details, optional artwork, then generate A4 PDF or 60mm thermal receipt.",
+      "All issued documents are searchable, immutable, and safely numbered per company/document type/year.",
+      "Company details, logo, stamp, signature, bank details, footer terms, templates, and numbering rules are editable.",
+      "Telegram and API flows create drafts and require confirmation before issue."
+    ]
+  },
+  "target_server": {
+    "provider": "Tencent Cloud",
+    "ip": "43.133.34.55",
+    "os": "Ubuntu",
+    "recommended_runtime": "Docker Compose on Ubuntu with Nginx reverse proxy, Certbot SSL, PostgreSQL, Redis, PHP-FPM, Laravel Horizon, and queue workers.",
+    "ports": [
+      "22 SSH restricted",
+      "80 HTTP redirect to HTTPS",
+      "443 HTTPS"
+    ],
+    "production_requirements": [
+      "SSL certificate",
+      "firewall",
+      "daily backups",
+      "queue supervisor",
+      "scheduler",
+      "log rotation",
+      "restore test"
+    ]
+  },
+  "current_workspace_state": {
+    "path": "c:\\Projek Coding\\Receipt Invoice Generator",
+    "observed_state": "Workspace was empty before creating this handoff bundle.",
+    "handoff_created": "c:\\Projek Coding\\Receipt Invoice Generator\\handoff\\claude-audit-pack-2026-05-17",
+    "source_code_status": "No app source files yet. The implementation phase should scaffold a new project."
+  },
+  "reference_files": [
+    {
+      "file_name": "Q-3118.xlsx",
+      "category": "excel",
+      "company": "Nas Ceria Services",
+      "document_family": "NAS Ceria Vertex42 quote/invoice",
+      "relative_path": "references/excel/Q-3118.xlsx",
+      "sha256": "cc5625accc08e4a1a524341a923802f85a8811f9badbe40f86d04ba2f887e534",
+      "audit_note": "8 sheets; NAS Ceria/Vertex42 style; Arial; quotation/invoice examples; item columns No, Item/Description, Qty, Rate, Amount."
+    },
+    {
+      "file_name": "Projek Masjid Muaz Bin jabal (2).xlsx",
+      "category": "excel",
+      "company": "Nas Ceria Services",
+      "document_family": "NAS Ceria quote/invoice with project sheets",
+      "relative_path": "references/excel/Projek Masjid Muaz Bin jabal (2).xlsx",
+      "sha256": "d33473c1ea6cd879f4570db72f0fd6a8d0324fae860e2d32654b81fdb52f0e7a",
+      "audit_note": "20 sheets; visible and hidden sheets; quotes/invoices mixed with inventory/costing sheets for Masjid Muadz/Muaz project."
+    },
+    {
+      "file_name": "INV-ABG HANIF BANNER.xlsx",
+      "category": "excel",
+      "company": "Wehdah Solution",
+      "document_family": "Wehdah invoice/quotation/artwork",
+      "relative_path": "references/excel/INV-ABG HANIF BANNER.xlsx",
+      "sha256": "f94811a36cb7c02e5bc7fa07d32f9dbc6732ae0aa3ed0e2121e41b88b028bc78",
+      "audit_note": "18 sheets; Wehdah Lao UI/Rockwell template family; many artwork pages; A4 invoice plus artwork confirmation layouts."
+    },
+    {
+      "file_name": "INV-ABG HANIF BANNER (1).xlsx",
+      "category": "excel",
+      "company": "Wehdah Solution",
+      "document_family": "Wehdah invoice/quotation/artwork",
+      "relative_path": "references/excel/INV-ABG HANIF BANNER (1).xlsx",
+      "sha256": "50757cdcbc72e328f71fe8492ea705c52cf6918b121adb2feae418a176233fa7",
+      "audit_note": "15 sheets; same Wehdah template family; ARTWORK sheet with invoice and artwork continuation pages."
+    },
+    {
+      "file_name": "INV-latest.xlsx",
+      "category": "excel",
+      "company": "Wehdah Solution",
+      "document_family": "Wehdah invoice/quotation/artwork latest",
+      "relative_path": "references/excel/INV-latest.xlsx",
+      "sha256": "d6b6eb5510c6393b9181d4beb941130ffd18b2da2eb8863d9518ad69aaab831e",
+      "audit_note": "16 sheets; Wehdah templates; includes recent artwork examples I-241207 and I-250110."
+    },
+    {
+      "file_name": "sham.xlsx",
+      "category": "excel",
+      "company": "Wehdah Solution",
+      "document_family": "Wehdah artwork invoice examples",
+      "relative_path": "references/excel/sham.xlsx",
+      "sha256": "54d43b2018dd96548446502f46ad49ec9313c981a0f4c0db3e8b98c33831351e",
+      "audit_note": "2 artwork sheets; Wehdah invoice layout with dense embedded artwork images."
+    },
+    {
+      "file_name": "QUOTATION MUBZ (1).xlsx",
+      "category": "excel",
+      "company": "Wehdah Solution",
+      "document_family": "Wehdah quotation/invoice plus blank billing templates",
+      "relative_path": "references/excel/QUOTATION MUBZ (1).xlsx",
+      "sha256": "9f93127362641d13c31237c8873ee7b8ac3d83f76d674e3df29151bc0fbc7bca",
+      "audit_note": "16 sheets; active Wehdah MUBZ quotation/invoice examples plus A To Z blank templates for DO, cash bill, PO, notes, receipt, voucher."
+    },
+    {
+      "file_name": "QUOTATION MUBZ (2).xlsx",
+      "category": "excel",
+      "company": "Wehdah Solution",
+      "document_family": "Wehdah quotation/invoice plus blank billing templates duplicate/reference",
+      "relative_path": "references/excel/QUOTATION MUBZ (2).xlsx",
+      "sha256": "3f50b9d8dc6686bb4f5298802979f3bc1dfcba13df387664a0e8ae7561b99b80",
+      "audit_note": "16 sheets; parsed structure matches QUOTATION MUBZ (1); keep as supplied reference for comparison."
+    },
+    {
+      "file_name": "INV-SIGNAGE dec.pdf",
+      "category": "pdf",
+      "company": "Wehdah Solution",
+      "document_family": "Wehdah issued invoice PDF with artwork page",
+      "relative_path": "references/pdf/INV-SIGNAGE dec.pdf",
+      "sha256": "27531486fdd80869f0ab2f08ce2b67d65b04904218936b63d4c0a752a19ef0f1",
+      "audit_note": "2 pages; page 1 invoice, page 2 artwork page; page size 1020x1320 pt; exact PDF output target for artwork attachment workflow."
+    },
+    {
+      "file_name": "PERSADA GEMILANG GLOBAL.xlsx",
+      "category": "excel",
+      "company": "Persada Gemilang Global",
+      "document_family": "Persada workbook with mixed template sheets",
+      "relative_path": "references/excel/PERSADA GEMILANG GLOBAL.xlsx",
+      "sha256": "9b39252fc057644dd4262a99613ba20d5bb7fe6e9546291be1bb33c3562ec582",
+      "audit_note": "13 sheets; canonical Persada billing sheet is INV 1; other sheets contain A To Z, Virtue, or Wehdah data and must not be treated as Persada canonical."
+    },
+    {
+      "file_name": "COP PERSADA GEMILANG GLOBAL.png",
+      "category": "image",
+      "company": "Persada Gemilang Global",
+      "document_family": "Persada stamp/chop",
+      "relative_path": "references/images/persada/COP PERSADA GEMILANG GLOBAL.png",
+      "sha256": "106e1eccf16b2b8e5e76360ff34b0774cf04c0c24e669d417f12c6d4e71454c4",
+      "audit_note": "PNG transparent stamp/chop; 294x296; blue company stamp with registration number."
+    },
+    {
+      "file_name": "Letterhead Persada Gemilang Global.jpg",
+      "category": "image",
+      "company": "Persada Gemilang Global",
+      "document_family": "Persada A4 letterhead",
+      "relative_path": "references/images/persada/Letterhead Persada Gemilang Global.jpg",
+      "sha256": "d90b4f275864e0e269637fd3ede94c1e6c0a7d7d0a97a7a9e1ab7454de6651ad",
+      "audit_note": "A4 letterhead background; 4963x7019; header logo/contact block, gradient bar, footer steps."
+    },
+    {
+      "file_name": "LOGO PERSADA GEMILANG GLOBAL.jpg",
+      "category": "image",
+      "company": "Persada Gemilang Global",
+      "document_family": "Persada logo",
+      "relative_path": "references/images/persada/LOGO PERSADA GEMILANG GLOBAL.jpg",
+      "sha256": "017e954c7df1db9f36240028a9572500980df56185651a4f2169ca55a48a09a5",
+      "audit_note": "JPG logo; 1048x408; navy/blue and green mark with uppercase wordmark."
+    }
+  ],
+  "template_audit_summary": {
+    "summary_file": "analysis/workbook-audit-summary.json",
+    "nas_ceria": {
+      "canonical_sources": [
+        "Q-3118.xlsx",
+        "Projek Masjid Muaz Bin jabal (2).xlsx"
+      ],
+      "style": "Vertex42-derived quote/invoice style, Arial fonts, pale headers, thin borders, 0.5 inch margins.",
+      "important_columns": [
+        "No",
+        "Item/Description",
+        "Qty",
+        "Rate (RM)",
+        "Amount (RM)"
+      ],
+      "caution": "Contains old sheets, hidden sheets, inventory/costing sheets, and messy numbering. Use as design reference only."
+    },
+    "wehdah": {
+      "canonical_sources": [
+        "INV-ABG HANIF BANNER.xlsx",
+        "INV-ABG HANIF BANNER (1).xlsx",
+        "INV-latest.xlsx",
+        "sham.xlsx",
+        "QUOTATION MUBZ (1).xlsx",
+        "QUOTATION MUBZ (2).xlsx",
+        "INV-SIGNAGE dec.pdf"
+      ],
+      "style": "Lao UI/Rockwell invoice/quotation family with dark blue title fills, structured item table, bank line, terms, signature/chop area.",
+      "important_columns": [
+        "Item",
+        "Description",
+        "Qty",
+        "Unit",
+        "Unit Price",
+        "Discount",
+        "Total Price"
+      ],
+      "artwork_pattern": "A4 invoice page followed by artwork page with thumbnails/captions and confirmation/sign-chop block."
+    },
+    "persada": {
+      "canonical_sources": [
+        "PERSADA GEMILANG GLOBAL.xlsx INV 1",
+        "Persada logo",
+        "Persada stamp",
+        "Persada letterhead"
+      ],
+      "style": "Navy/green brand, logo/contact header, Persada stamp, optional full A4 letterhead background.",
+      "caution": "Only INV 1 is canonical in workbook. Other sheets contain mixed A To Z, Virtue, and Wehdah data."
+    },
+    "virtue_damsel": {
+      "canonical_sources": [
+        "Mixed sheet in PERSADA GEMILANG GLOBAL.xlsx"
+      ],
+      "status": "Partial only. Needs user-confirmed logo, stamp, bank, address, TIN/SST, and final template rules."
+    },
+    "generic_a_to_z": {
+      "status": "Template reference only. Not a company profile by default.",
+      "usable_for": [
+        "Delivery Order",
+        "Cash Bill",
+        "Purchase Order",
+        "Credit Note",
+        "Debit Note",
+        "Official Receipt",
+        "Payment Voucher"
+      ]
+    }
+  },
+  "companies": [
+    {
+      "name": "Wehdah Solution",
+      "code": "WS",
+      "registration_no": "202103190949 (PG0514579-H)",
+      "address": [
+        "Wisma UOA II, Unit/Unite No: 15-13A",
+        "UOA Business Centre, Jalan Pinang",
+        "50450 Kuala Lumpur, Malaysia"
+      ],
+      "phone": "+6017-3123415",
+      "email": "wehdahsolution@gmail.com",
+      "bank_accounts_observed": [
+        "Hong Leong Islamic 18701038380",
+        "Bank Islam 12113010769313"
+      ],
+      "template_family": "Wehdah Lao UI/Rockwell",
+      "supported_document_types_v1": [
+        "quotation",
+        "invoice",
+        "receipt",
+        "delivery_order",
+        "cash_bill",
+        "credit_note",
+        "debit_note",
+        "purchase_order",
+        "payment_voucher",
+        "proforma_invoice"
+      ],
+      "special_features": [
+        "artwork attachment pages for printing/design jobs"
+      ],
+      "missing_info": [
+        "TIN",
+        "SST/tax status",
+        "official logo source if any",
+        "signature asset/name/title",
+        "final canonical address spelling Unit vs Unite"
+      ]
+    },
+    {
+      "name": "Persada Gemilang Global",
+      "code": "PGG",
+      "registration_no": "202503350239 (AS0507799-U)",
+      "address_observed_workbook": [
+        "D-11-5,PPR Jalan Sri Sentosa",
+        "Jalan Taman Seri Sentosa",
+        "58000 Kuala Lumpur"
+      ],
+      "address_observed_letterhead": [
+        "D-11-5, PPR Jalan Sri Sentosa",
+        "Jalan Taman Seri Sentosa Taman Seri Sentosa",
+        "58000 KL"
+      ],
+      "phone": "+6010-353 1955",
+      "email": "persadagemilangmy@gmail.com",
+      "website_observed": "www.persadagemilang.my",
+      "bank_accounts_observed": [
+        "Bank Rakyat 110 258 1847"
+      ],
+      "template_family": "Persada navy/green brand with letterhead and stamp",
+      "supported_document_types_v1": [
+        "quotation",
+        "invoice",
+        "receipt",
+        "delivery_order",
+        "cash_bill",
+        "credit_note",
+        "debit_note",
+        "purchase_order",
+        "payment_voucher",
+        "proforma_invoice"
+      ],
+      "missing_info": [
+        "Canonical address wording",
+        "Bank account holder name",
+        "TIN",
+        "SST/tax status",
+        "signer name/title",
+        "whether website appears on billing PDFs"
+      ]
+    },
+    {
+      "name": "Nas Ceria Services",
+      "code": "NCS",
+      "registration_no": "003035718-X",
+      "address": [
+        "14-1, 1st Floor, Jalan Wangsa Budi 1",
+        "Taman Wangsa Melawati",
+        "53300 Kuala Lumpur"
+      ],
+      "phone": "019-3733467",
+      "email_observed": "Toncet30@gmail.com",
+      "bank_accounts_observed": [
+        "Am Bank 8881039261301"
+      ],
+      "template_family": "NAS Ceria Vertex42/Arial",
+      "supported_document_types_v1": [
+        "quotation",
+        "invoice",
+        "receipt",
+        "delivery_order",
+        "cash_bill",
+        "credit_note",
+        "debit_note",
+        "purchase_order",
+        "payment_voucher",
+        "proforma_invoice"
+      ],
+      "missing_info": [
+        "TIN",
+        "SST/tax status",
+        "official logo/stamp/signature assets",
+        "canonical email case/spelling",
+        "final bank account holder name"
+      ]
+    },
+    {
+      "name": "Virtue Damsel Solution",
+      "code": "VDS",
+      "registration_no_observed": "002976929-K",
+      "address_observed": [
+        "No 30, RD 3, Taman Ramal Desa",
+        "43000 Kajang Selangor"
+      ],
+      "phone_observed": "03 89125200",
+      "bank_accounts_observed_unverified": [
+        "Maybank 5620 2164 4859"
+      ],
+      "template_family": "Partial mixed workbook reference only",
+      "supported_document_types_v1": [
+        "quotation",
+        "invoice",
+        "receipt",
+        "delivery_order",
+        "cash_bill",
+        "credit_note",
+        "debit_note",
+        "purchase_order",
+        "payment_voucher",
+        "proforma_invoice"
+      ],
+      "missing_info": [
+        "Confirm company is active/in-scope",
+        "logo",
+        "stamp",
+        "signature",
+        "email",
+        "website",
+        "TIN",
+        "SST/tax status",
+        "canonical bank details",
+        "canonical template source"
+      ]
+    }
+  ],
+  "document_types": [
+    {
+      "key": "quotation",
+      "label": "Quotation",
+      "default_code": "Q",
+      "purpose": "Quote before sale/work confirmation",
+      "can_convert_to": [
+        "invoice",
+        "delivery_order"
+      ],
+      "amount_document": true
+    },
+    {
+      "key": "invoice",
+      "label": "Invoice",
+      "default_code": "INV",
+      "purpose": "Amount payable by customer",
+      "can_convert_to": [
+        "receipt",
+        "delivery_order",
+        "credit_note",
+        "debit_note"
+      ],
+      "amount_document": true,
+      "einvoice_metadata_relevant": true
+    },
+    {
+      "key": "receipt",
+      "label": "Official Receipt",
+      "default_code": "RCPT",
+      "purpose": "Payment received proof",
+      "amount_document": true
+    },
+    {
+      "key": "delivery_order",
+      "label": "Delivery Order",
+      "default_code": "DO",
+      "purpose": "Delivery/received goods confirmation",
+      "can_convert_to": [
+        "invoice"
+      ],
+      "amount_document": false
+    },
+    {
+      "key": "cash_bill",
+      "label": "Cash Bill",
+      "default_code": "CB",
+      "purpose": "Immediate cash sale record",
+      "amount_document": true
+    },
+    {
+      "key": "credit_note",
+      "label": "Credit Note",
+      "default_code": "CN",
+      "purpose": "Reduce amount owed/refund adjustment",
+      "amount_document": true,
+      "einvoice_metadata_relevant": true
+    },
+    {
+      "key": "debit_note",
+      "label": "Debit Note",
+      "default_code": "DN",
+      "purpose": "Increase amount owed/charge adjustment",
+      "amount_document": true,
+      "einvoice_metadata_relevant": true
+    },
+    {
+      "key": "purchase_order",
+      "label": "Purchase Order",
+      "default_code": "PO",
+      "purpose": "Order to supplier",
+      "amount_document": true
+    },
+    {
+      "key": "payment_voucher",
+      "label": "Payment Voucher",
+      "default_code": "PV",
+      "purpose": "Outgoing payment approval/record",
+      "amount_document": true
+    },
+    {
+      "key": "proforma_invoice",
+      "label": "Proforma Invoice",
+      "default_code": "PFI",
+      "purpose": "Preliminary invoice before final invoice",
+      "amount_document": true
+    }
+  ],
+  "numbering_policy": {
+    "scope": "company_id + document_type + year + optional branch/project/reset_policy",
+    "default_pattern": "{COMPANY_CODE}-{DOC_CODE}-{YY}{SEQ_3}",
+    "example_2026": [
+      "WS-INV-26001",
+      "WS-Q-26001",
+      "PGG-INV-26001",
+      "NCS-Q-26001",
+      "VDS-RCPT-26001"
+    ],
+    "sequence_start_default": 1,
+    "sequence_display_default": "YY plus 3 digits, e.g. 26001 for first 2026 document",
+    "draft_policy": "Drafts have internal draft_id only. Final number is allocated inside a DB transaction when issued.",
+    "collision_control": [
+      "DB unique constraint on company_id, document_type, issue_year, document_number",
+      "Row lock sequence counter during issue",
+      "Idempotency key for API-created documents"
+    ],
+    "manual_override": "Admin may set starting number before first issue for a company/type/year. Overrides after issue require audit log and no duplicate allowed.",
+    "legacy_numbers": "Old Excel numbers are stored only as design examples, not used to calculate next production number unless user explicitly decides later."
+  },
+  "document_workflows": {
+    "statuses": [
+      "draft",
+      "issued",
+      "sent",
+      "accepted",
+      "converted",
+      "partial_paid",
+      "paid",
+      "void",
+      "cancelled"
+    ],
+    "draft": [
+      "Editable fields, no official number, preview watermark optional, attachments allowed"
+    ],
+    "issue": [
+      "Validate required fields, allocate official number transactionally, render immutable PDF, write audit event"
+    ],
+    "send": [
+      "Email/Telegram/share link optional, audit event recorded"
+    ],
+    "convert": [
+      "Quotation to invoice/DO, invoice to receipt, invoice adjustment to credit/debit note; preserve source_document_id link"
+    ],
+    "void_cancel": [
+      "Issued document cannot be deleted; void/cancel requires reason and preserves PDF"
+    ],
+    "payment": [
+      "Support partial/full payment, method, reference number, paid_at, receipt generation"
+    ]
+  },
+  "pdf_and_printing": {
+    "a4_pdf_engine": "HTML/CSS rendered through Playwright/Browsershot Chromium for accurate Excel-like layout and image placement.",
+    "template_strategy": "Use structured Blade/React-compatible HTML templates per company and document type, not raw Excel generation. Maintain visual match through CSS tokens.",
+    "page_sizes": [
+      "A4 portrait for main documents",
+      "60mm width thermal receipt PDF for receipt/quick print"
+    ],
+    "immutability": "Store final generated PDF and rendered metadata after issue. Re-render only by revision/void/new document, not by silently changing issued PDF.",
+    "visual_qa": [
+      "PDF page size check",
+      "Header/company identity check",
+      "No cross-company logo/template leak",
+      "Long item wrapping",
+      "Artwork page fit and caption check"
+    ]
+  },
+  "artwork_attachments": {
+    "supported_for": [
+      "invoice",
+      "quotation",
+      "delivery_order"
+    ],
+    "primary_use_case": "Wehdah printing/design invoices where artwork/design proof must be appended after the main document.",
+    "inputs": [
+      "jpg",
+      "jpeg",
+      "png",
+      "webp",
+      "pdf"
+    ],
+    "storage": "Preserve original uploaded file and generate normalized preview thumbnails.",
+    "layout": "Append one or more A4 pages after main PDF. Use clean grid/table with labels Artwork 1, Artwork 2, etc., confirmation line, and company sign/chop area.",
+    "controls": [
+      "optional upload",
+      "order artwork manually",
+      "caption per artwork",
+      "include/exclude per document",
+      "append before/after main document setting"
+    ]
+  },
+  "thermal_receipt": {
+    "width": "60mm",
+    "format": "Separate compact receipt template, not scaled-down A4.",
+    "content": [
+      "Company short name",
+      "receipt number",
+      "date/time",
+      "customer optional",
+      "items/description",
+      "qty",
+      "amount",
+      "subtotal",
+      "discount/tax if any",
+      "grand total",
+      "payment method",
+      "reference number",
+      "thank you/footer",
+      "optional QR"
+    ],
+    "style": [
+      "monospace/thermal-friendly font",
+      "high contrast",
+      "short line wrapping",
+      "no heavy images unless logo is tiny and optional"
+    ],
+    "outputs": [
+      "PDF 60mm",
+      "browser print view",
+      "future ESC/POS export optional"
+    ]
+  },
+  "api_requirements": {
+    "auth": "Laravel Sanctum for first version; token scopes per company and action.",
+    "documentation": "OpenAPI/Swagger generated docs.",
+    "core_endpoints": [
+      "companies",
+      "customers",
+      "products/services",
+      "documents",
+      "document lines",
+      "attachments",
+      "payments",
+      "number preview",
+      "issue document",
+      "render PDF",
+      "webhooks"
+    ],
+    "safety": [
+      "idempotency keys for create/issue",
+      "rate limits",
+      "audit log for all API mutations",
+      "company permission checks on every request"
+    ],
+    "example_document_create_flow": [
+      "POST draft",
+      "POST line items/attachments",
+      "GET preview PDF",
+      "POST issue with confirmation/idempotency key",
+      "GET final PDF"
+    ]
+  },
+  "telegram_bot": {
+    "mode": "Webhook mode integrated with Laravel routes and queues.",
+    "permissions": "Whitelist Telegram users and map each user to allowed companies/actions.",
+    "commands": [
+      "/new_invoice",
+      "/new_quotation",
+      "/receipt",
+      "/status DOCNO",
+      "/attach",
+      "/preview",
+      "/confirm_issue",
+      "/cancel_draft"
+    ],
+    "ai_assisted_flow": [
+      "User sends natural language request",
+      "DeepSeek parses into structured draft JSON",
+      "System validates and recalculates totals",
+      "User receives preview and summary",
+      "User must explicitly confirm issue",
+      "System allocates final number and sends PDF"
+    ],
+    "hard_rule": "Telegram can create drafts and previews, but cannot issue without explicit confirmation from an authorized user."
+  },
+  "deepseek_ai": {
+    "role": "Optional assistant for parsing/drafting, not source of truth.",
+    "planned_model": "deepseek-v4-pro for highest accuracy when available/configured; allow cheaper fallback model for simple extraction.",
+    "uses": [
+      "parse Malay/English invoice requests",
+      "extract customer/items/qty/price from text",
+      "draft quotation descriptions",
+      "classify uploaded documents",
+      "translate labels/copy",
+      "flag suspicious total mismatch"
+    ],
+    "controls": [
+      "strict JSON schema output",
+      "server recalculates totals",
+      "redact sensitive data where possible",
+      "store AI request/response metadata",
+      "manual confirmation required before issue"
+    ]
+  },
+  "einvoice_metadata_ready": {
+    "scope_v1": "Store and validate metadata fields needed for future Malaysia MyInvois integration, but do not submit to MyInvois in v1.",
+    "supplier_fields": [
+      "TIN",
+      "BRN/registration no",
+      "SST registration no",
+      "MSIC code",
+      "business activity description",
+      "address",
+      "contact",
+      "email"
+    ],
+    "buyer_fields": [
+      "TIN optional/required by scenario",
+      "BRN/NRIC/passport",
+      "name",
+      "address",
+      "contact",
+      "email"
+    ],
+    "document_fields": [
+      "classification code",
+      "currency",
+      "exchange rate",
+      "tax type",
+      "tax rate",
+      "tax amount",
+      "exemption reason",
+      "payment mode",
+      "billing period",
+      "reference documents"
+    ],
+    "future_myinvois_status_fields": [
+      "submission_uid",
+      "long_id",
+      "uuid",
+      "validation_status",
+      "validation_errors",
+      "qr_url",
+      "submitted_at",
+      "cancelled_at",
+      "rejected_at"
+    ],
+    "documents_relevant_to_future_submission": [
+      "invoice",
+      "credit_note",
+      "debit_note",
+      "refund_note later",
+      "self_billed variants later"
+    ],
+    "internal_only_documents": [
+      "quotation",
+      "delivery_order",
+      "receipt",
+      "purchase_order",
+      "payment_voucher unless future rules require otherwise"
+    ]
+  },
+  "data_model": {
+    "core_tables": [
+      "users",
+      "roles",
+      "permissions",
+      "companies",
+      "company_users",
+      "customers",
+      "products",
+      "services",
+      "documents",
+      "document_lines",
+      "document_attachments",
+      "payments",
+      "sequence_counters",
+      "templates",
+      "template_versions",
+      "audit_logs",
+      "api_tokens",
+      "ai_requests",
+      "telegram_messages",
+      "e_invoice_metadata"
+    ],
+    "document_key_fields": [
+      "company_id",
+      "document_type",
+      "status",
+      "draft_no",
+      "document_no",
+      "issue_date",
+      "customer_id",
+      "currency",
+      "subtotal",
+      "discount_total",
+      "tax_total",
+      "grand_total",
+      "amount_paid",
+      "balance_due",
+      "source_document_id",
+      "created_by",
+      "issued_by"
+    ],
+    "line_item_fields": [
+      "description",
+      "long_description",
+      "qty",
+      "unit",
+      "unit_price",
+      "discount_type",
+      "discount_value",
+      "tax_code",
+      "tax_rate",
+      "line_total",
+      "sort_order"
+    ],
+    "template_fields": [
+      "company_id",
+      "document_type",
+      "name",
+      "version",
+      "is_active",
+      "brand_colors",
+      "logo_position",
+      "font_family",
+      "labels_json",
+      "terms_json",
+      "css_json"
+    ],
+    "audit_fields": [
+      "actor_id",
+      "company_id",
+      "action",
+      "auditable_type",
+      "auditable_id",
+      "before_json",
+      "after_json",
+      "ip_address",
+      "user_agent",
+      "created_at"
+    ]
+  },
+  "security_audit_backup": {
+    "auth": [
+      "2FA optional for admin",
+      "strong password policy",
+      "role-based permissions",
+      "company scoping"
+    ],
+    "data_safety": [
+      "issued documents immutable",
+      "soft delete drafts only",
+      "no hard delete issued docs",
+      "audit trail for all important changes"
+    ],
+    "uploads": [
+      "file type validation",
+      "size limits",
+      "virus scan optional/future",
+      "private storage path",
+      "signed temporary download URLs"
+    ],
+    "backups": [
+      "daily encrypted PostgreSQL dump",
+      "daily storage archive",
+      "offsite backup target recommended",
+      "monthly restore drill"
+    ],
+    "logs_monitoring": [
+      "Laravel logs",
+      "queue failure logs",
+      "Nginx logs",
+      "backup logs",
+      "disk usage alert",
+      "SSL expiry alert"
+    ]
+  },
+  "deployment_plan": {
+    "recommended_stack": [
+      "Laravel 12",
+      "PHP 8.3+",
+      "PostgreSQL",
+      "Redis",
+      "React/Inertia",
+      "Tailwind",
+      "Playwright/Chromium",
+      "Nginx",
+      "Docker Compose"
+    ],
+    "server_steps": [
+      "Provision Ubuntu server",
+      "Set firewall for 22/80/443",
+      "Install Docker/Compose or native stack",
+      "Configure Nginx and SSL",
+      "Deploy app env",
+      "Run migrations/seeders",
+      "Start queue and scheduler",
+      "Run production smoke tests",
+      "Enable backups"
+    ],
+    "environments": [
+      "local",
+      "staging optional",
+      "production"
+    ],
+    "secrets_needed": [
+      "APP_KEY",
+      "DB credentials",
+      "Redis credentials if any",
+      "DeepSeek API key",
+      "Telegram bot token",
+      "Telegram webhook secret",
+      "mail credentials",
+      "backup encryption key"
+    ]
+  },
+  "test_plan": {
+    "unit_tests": [
+      "numbering sequence per company/type/year",
+      "concurrent issue collision prevention",
+      "subtotal/discount/tax/grand total calculations",
+      "status transitions",
+      "payment balance calculations"
+    ],
+    "feature_tests": [
+      "company permission isolation",
+      "draft creation",
+      "issue document",
+      "void/cancel with reason",
+      "convert quotation to invoice/DO",
+      "receipt from payment",
+      "API idempotency",
+      "upload artwork"
+    ],
+    "pdf_tests": [
+      "A4 page dimensions",
+      "company branding match",
+      "Wehdah artwork appended page",
+      "Persada logo/stamp placement",
+      "NAS table layout",
+      "long description wrapping"
+    ],
+    "thermal_tests": [
+      "60mm width",
+      "long item text wrapping",
+      "total visible",
+      "payment method/reference",
+      "print CSS sanity"
+    ],
+    "telegram_ai_tests": [
+      "mock DeepSeek JSON parse",
+      "invalid total rejected",
+      "unauthorized Telegram user rejected",
+      "draft preview before issue",
+      "confirmation required"
+    ],
+    "production_smoke_tests": [
+      "login",
+      "create draft per company",
+      "preview PDF",
+      "issue one test document per major template family",
+      "download final PDF",
+      "verify queue",
+      "verify backup job/log"
+    ]
+  },
+  "implementation_phases": [
+    {
+      "phase": 0,
+      "name": "Audit closure and missing info confirmation",
+      "deliverables": [
+        "Claude audit feedback",
+        "final v1 scope",
+        "confirmed company details/assets"
+      ],
+      "acceptance_gate": "No unresolved blocker for v1 scaffold."
+    },
+    {
+      "phase": 1,
+      "name": "Scaffold and infrastructure",
+      "deliverables": [
+        "Laravel/Inertia project",
+        "Docker Compose",
+        "PostgreSQL/Redis",
+        "auth/roles",
+        "CI/test baseline"
+      ],
+      "acceptance_gate": "App boots locally and tests pass."
+    },
+    {
+      "phase": 2,
+      "name": "Company, customers, products, numbering",
+      "deliverables": [
+        "CRUD screens",
+        "sequence counters",
+        "audit log",
+        "company scoping"
+      ],
+      "acceptance_gate": "Per-company numbering tests pass under concurrency."
+    },
+    {
+      "phase": 3,
+      "name": "Document workflows",
+      "deliverables": [
+        "Draft/issue/void/convert/payment flows",
+        "line items",
+        "attachments"
+      ],
+      "acceptance_gate": "Feature tests cover main document lifecycle."
+    },
+    {
+      "phase": 4,
+      "name": "PDF and thermal templates",
+      "deliverables": [
+        "Wehdah/NAS/Persada templates",
+        "artwork page",
+        "60mm receipt"
+      ],
+      "acceptance_gate": "Visual/PDF checks pass and no company brand leaks."
+    },
+    {
+      "phase": 5,
+      "name": "API, Telegram, DeepSeek",
+      "deliverables": [
+        "Sanctum API",
+        "OpenAPI docs",
+        "Telegram bot",
+        "AI parse draft flow"
+      ],
+      "acceptance_gate": "AI/Telegram cannot issue without confirmation."
+    },
+    {
+      "phase": 6,
+      "name": "Production deployment",
+      "deliverables": [
+        "Tencent Ubuntu deployment",
+        "SSL",
+        "queues",
+        "backups",
+        "smoke evidence"
+      ],
+      "acceptance_gate": "Production smoke and backup verification pass."
+    }
+  ],
+  "known_missing_info": [
+    {
+      "company": "Persada Gemilang Global",
+      "missing": [
+        "Canonical address wording",
+        "Bank Rakyat account holder name",
+        "TIN",
+        "SST status",
+        "signer name/title",
+        "whether website should appear on invoices/receipts"
+      ]
+    },
+    {
+      "company": "Wehdah Solution",
+      "missing": [
+        "TIN",
+        "SST status",
+        "official logo/stamp/signature assets",
+        "canonical address spelling Unit/Unite",
+        "signer name/title"
+      ]
+    },
+    {
+      "company": "Nas Ceria Services",
+      "missing": [
+        "TIN",
+        "SST status",
+        "logo/stamp/signature assets",
+        "canonical email",
+        "bank account holder name"
+      ]
+    },
+    {
+      "company": "Virtue Damsel Solution",
+      "missing": [
+        "Confirm active/in-scope",
+        "all company profile fields",
+        "logo/stamp/signature assets",
+        "canonical bank details",
+        "canonical template source"
+      ]
+    },
+    {
+      "system": "Deployment",
+      "missing": [
+        "Domain name",
+        "SSH username/key",
+        "production email service",
+        "Telegram bot token",
+        "DeepSeek API key",
+        "backup destination"
+      ]
+    }
+  ],
+  "acceptance_criteria": [
+    "All explicitly listed reference files exist inside references folders.",
+    "reference-manifest.json contains SHA256, size, source path, copied path, company, category, and audit notes for every reference file.",
+    "Main JSON can be read by Claude without needing the chat history.",
+    "Main JSON includes locked decisions, audit summary, missing info, architecture, API, Telegram, DeepSeek, e-Invoice metadata, deployment, and test plan.",
+    "No old Excel records are treated as production records.",
+    "No company template, numbering, or records are mixed across companies."
+  ]
+}
