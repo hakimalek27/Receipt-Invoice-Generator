@@ -144,6 +144,74 @@ class DocumentController extends Controller
         return response()->json($draft->load('items'), 201);
     }
 
+    public function update(Request $request, int $id): \Illuminate\Http\JsonResponse
+    {
+        $document = Document::with('items')->findOrFail($id);
+        if ($document->company_id !== $request->user()->company_id
+            && ! $request->user()->isSuperAdmin()) {
+            return response()->json(['error' => 'Company scope violation'], 403);
+        }
+        if (! $document->isDraft()) {
+            return response()->json(['error' => 'Only draft documents can be updated'], 422);
+        }
+
+        $data = $request->validate([
+            'document_date' => 'nullable|date',
+            'due_date' => 'nullable|date',
+            'notes' => 'nullable|string',
+            'terms' => 'nullable|string',
+            'internal_notes' => 'nullable|string',
+        ]);
+
+        $document->update($data);
+
+        return response()->json($document->fresh('items'));
+    }
+
+    public function void(Request $request, int $id): \Illuminate\Http\JsonResponse
+    {
+        $document = Document::findOrFail($id);
+        if ($document->company_id !== $request->user()->company_id
+            && ! $request->user()->isSuperAdmin()) {
+            return response()->json(['error' => 'Company scope violation'], 403);
+        }
+
+        $data = $request->validate(['reason' => 'required|string|min:1']);
+
+        try {
+            return response()->json($this->workflow->void($id, $data['reason'], $request->user()->id));
+        } catch (\RuntimeException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
+    public function convert(Request $request, int $id): \Illuminate\Http\JsonResponse
+    {
+        $document = Document::findOrFail($id);
+        if ($document->company_id !== $request->user()->company_id
+            && ! $request->user()->isSuperAdmin()) {
+            return response()->json(['error' => 'Company scope violation'], 403);
+        }
+
+        $data = $request->validate([
+            'target_type' => 'required|string',
+            'document_date' => 'nullable|date',
+            'due_date' => 'nullable|date',
+            'notes' => 'nullable|string',
+            'terms' => 'nullable|string',
+            'items' => 'nullable|array',
+        ]);
+
+        try {
+            return response()->json(
+                $this->workflow->convert($id, $data['target_type'], $data)->load('items'),
+                201
+            );
+        } catch (\RuntimeException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
     /**
      * List documents for the authenticated user's company.
      */

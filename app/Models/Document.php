@@ -85,6 +85,11 @@ class Document extends Model
         return $this->hasMany(PaymentAllocation::class);
     }
 
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(DocumentAttachment::class)->orderBy('sort_order');
+    }
+
     public function convertedFrom(): BelongsTo
     {
         return $this->belongsTo(Document::class, 'converted_from_id');
