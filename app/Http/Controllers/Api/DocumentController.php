@@ -138,8 +138,16 @@ class DocumentController extends Controller
         ]);
 
         $data['company_id'] = $request->user()->company_id;
+        $data['currency'] = strtoupper($data['currency'] ?? 'MYR');
+        if ($data['currency'] !== 'MYR' && empty($data['fx_rate'])) {
+            return response()->json(['error' => 'Non-MYR documents require an FX rate snapshot'], 422);
+        }
 
-        $draft = $this->workflow->createDraft($data);
+        try {
+            $draft = $this->workflow->createDraft($data);
+        } catch (\RuntimeException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
 
         return response()->json($draft->load('items'), 201);
     }

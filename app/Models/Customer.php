@@ -16,7 +16,8 @@ class Customer extends Model
     protected $fillable = [
         'company_id', 'name', 'attention_to', 'address', 'address_line_2',
         'city', 'state', 'postcode', 'country', 'phone', 'email',
-        'tax_identifier', 'is_active', 'metadata',
+        'tax_identifier', 'brn_registration_number', 'sst_registration_number',
+        'msic_code', 'is_active', 'metadata',
     ];
 
     protected $casts = [

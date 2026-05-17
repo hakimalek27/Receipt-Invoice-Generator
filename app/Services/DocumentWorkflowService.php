@@ -58,6 +58,12 @@ class DocumentWorkflowService
                 }
             }
 
+            $currency = strtoupper($data['currency'] ?? 'MYR');
+            $fxRate = $data['fx_rate'] ?? null;
+            if ($currency !== 'MYR' && ((float) $fxRate) <= 0) {
+                throw new \RuntimeException('Non-MYR documents require an FX rate snapshot');
+            }
+
             $document = Document::create([
                 'company_id' => $data['company_id'],
                 'document_type' => $data['document_type'],
@@ -65,8 +71,8 @@ class DocumentWorkflowService
                 'customer_id' => $data['customer_id'] ?? null,
                 'document_date' => $data['document_date'] ?? now()->toDateString(),
                 'due_date' => $data['due_date'] ?? null,
-                'currency' => $data['currency'] ?? 'MYR',
-                'fx_rate' => $data['fx_rate'] ?? null,
+                'currency' => $currency,
+                'fx_rate' => $fxRate,
                 'notes' => $data['notes'] ?? null,
                 'terms' => $data['terms'] ?? null,
                 'show_amount_in_words' => $data['show_amount_in_words'] ?? false,
@@ -157,8 +163,8 @@ class DocumentWorkflowService
                 'official_number' => $officialNumber,
                 'issued_at' => now(),
                 'issue_timezone_snapshot' => 'Asia/Kuala_Lumpur',
-                'issuer_snapshot_json' => $company ? $company->only(['name', 'code', 'address', 'phone', 'email', 'registration_number']) : null,
-                'buyer_snapshot_json' => $customer ? $customer->only(['name', 'address', 'phone', 'email', 'tax_identifier']) : null,
+                'issuer_snapshot_json' => $company ? $this->companySnapshot($company) : null,
+                'buyer_snapshot_json' => $customer ? $this->customerSnapshot($customer) : null,
                 'bank_snapshot_json' => $company ? $company->only(['name', 'code']) : null,
                 'terms_snapshot_json' => ['terms' => $document->terms],
                 'tax_snapshot_json' => ['tax_total' => $document->tax_total],
@@ -204,6 +210,7 @@ class DocumentWorkflowService
                 'document_date' => $overrides['document_date'] ?? now()->toDateString(),
                 'due_date' => $overrides['due_date'] ?? null,
                 'currency' => $source->currency,
+                'fx_rate' => $source->fx_rate,
                 'notes' => $overrides['notes'] ?? $source->notes,
                 'terms' => $overrides['terms'] ?? $source->terms,
                 'converted_from_id' => $source->id,
@@ -391,9 +398,73 @@ class DocumentWorkflowService
         }
 
         $company = Company::find($document->company_id);
-        $currentIssuer = $company->only(['name', 'code', 'address', 'phone', 'email', 'registration_number']);
+        $currentIssuer = $company ? $this->companySnapshot($company) : null;
 
         return $document->issuer_snapshot_json === $currentIssuer;
+    }
+
+    private function companySnapshot(Company $company): array
+    {
+        return [
+            'name' => $company->name,
+            'code' => $company->code,
+            'address' => $company->address,
+            'address_line_2' => $company->address_line_2,
+            'city' => $company->city,
+            'state' => $company->state,
+            'postcode' => $company->postcode,
+            'country' => $company->country,
+            'canonical_address' => $this->canonicalAddress([
+                $company->address,
+                $company->address_line_2,
+                $company->postcode,
+                $company->city,
+                $company->state,
+                $company->country,
+            ]),
+            'phone' => $company->phone,
+            'email' => $company->email,
+            'registration_number' => $company->registration_number,
+            'tin' => $company->tin,
+            'sst_registration_number' => $company->sst_registration_number,
+            'msic_code' => $company->msic_code,
+            'business_activity_description' => $company->business_activity_description,
+        ];
+    }
+
+    private function customerSnapshot(Customer $customer): array
+    {
+        return [
+            'name' => $customer->name,
+            'address' => $customer->address,
+            'address_line_2' => $customer->address_line_2,
+            'city' => $customer->city,
+            'state' => $customer->state,
+            'postcode' => $customer->postcode,
+            'country' => $customer->country,
+            'canonical_address' => $this->canonicalAddress([
+                $customer->address,
+                $customer->address_line_2,
+                $customer->postcode,
+                $customer->city,
+                $customer->state,
+                $customer->country,
+            ]),
+            'phone' => $customer->phone,
+            'email' => $customer->email,
+            'tax_identifier' => $customer->tax_identifier,
+            'brn_registration_number' => $customer->brn_registration_number,
+            'sst_registration_number' => $customer->sst_registration_number,
+            'msic_code' => $customer->msic_code,
+        ];
+    }
+
+    private function canonicalAddress(array $parts): string
+    {
+        return collect($parts)
+            ->filter(fn ($part) => trim((string) $part) !== '')
+            ->map(fn ($part) => preg_replace('/\s+/', ' ', trim((string) $part)))
+            ->implode(', ');
     }
 
     public function createOfficialReceiptForPayment(Payment $payment, ?int $userId = null): Document
