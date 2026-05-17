@@ -11,9 +11,12 @@ return new class extends Migration
         Schema::create('payments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('company_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('receipt_document_id')->nullable()->constrained('documents')->nullOnDelete();
             $table->date('payment_date');
             $table->decimal('amount', 18, 2);
             $table->decimal('unallocated_amount', 18, 2);
+            $table->string('currency', 3)->default('MYR');
+            $table->decimal('fx_rate', 18, 8)->nullable();
             $table->string('method', 30)->default('bank_transfer');
             $table->string('reference_number')->nullable();
             $table->text('notes')->nullable();

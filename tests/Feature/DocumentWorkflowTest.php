@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\Customer;
 use App\Models\Document;
 use App\Models\NumberingPolicy;
+use App\Services\PdfRenderService;
 use App\Services\DocumentFingerprintService;
 use App\Services\DocumentWorkflowService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -148,6 +149,97 @@ class DocumentWorkflowTest extends TestCase
         $this->assertCount(1, $payment->allocations);
     }
 
+    public function test_payment_allocation_requires_issued_receivable_document(): void
+    {
+        $draft = $this->workflow->createDraft([
+            'company_id' => $this->company->id,
+            'document_type' => 'invoice',
+            'items' => [['description' => 'X', 'quantity' => 1, 'unit_price' => 100]],
+        ]);
+
+        $payment = $this->workflow->recordPayment([
+            'company_id' => $this->company->id,
+            'amount' => 100,
+        ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Payments can only be allocated to issued documents');
+        $this->workflow->allocatePaymentToDocument($payment, $draft->id, 100);
+    }
+
+    public function test_payment_allocation_cannot_exceed_invoice_outstanding(): void
+    {
+        $invoice = $this->workflow->issue(
+            $this->workflow->createDraft([
+                'company_id' => $this->company->id,
+                'document_type' => 'invoice',
+                'items' => [['description' => 'X', 'quantity' => 1, 'unit_price' => 100]],
+            ])->id
+        );
+
+        $payment = $this->workflow->recordPayment([
+            'company_id' => $this->company->id,
+            'amount' => 150,
+        ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('exceeds outstanding');
+        $this->workflow->allocatePaymentToDocument($payment, $invoice->id, 150);
+    }
+
+    public function test_payment_allocation_rejects_currency_mismatch(): void
+    {
+        $invoice = $this->workflow->issue(
+            $this->workflow->createDraft([
+                'company_id' => $this->company->id,
+                'document_type' => 'invoice',
+                'currency' => 'USD',
+                'fx_rate' => 4.7,
+                'items' => [['description' => 'X', 'quantity' => 1, 'unit_price' => 100]],
+            ])->id
+        );
+
+        $payment = $this->workflow->recordPayment([
+            'company_id' => $this->company->id,
+            'amount' => 100,
+            'currency' => 'MYR',
+        ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('currency must match');
+        $this->workflow->allocatePaymentToDocument($payment, $invoice->id, 100);
+    }
+
+    public function test_payment_can_create_and_link_official_receipt(): void
+    {
+        $customer = Customer::factory()->create(['company_id' => $this->company->id]);
+        $invoice = $this->workflow->issue(
+            $this->workflow->createDraft([
+                'company_id' => $this->company->id,
+                'document_type' => 'invoice',
+                'customer_id' => $customer->id,
+                'items' => [['description' => 'X', 'quantity' => 1, 'unit_price' => 100]],
+            ])->id
+        );
+
+        $payment = $this->workflow->recordPayment([
+            'company_id' => $this->company->id,
+            'amount' => 100,
+            'reference_number' => 'PAY-001',
+            'create_official_receipt' => true,
+            'allocations' => [
+                ['document_id' => $invoice->id, 'amount' => 100],
+            ],
+        ]);
+
+        $receipt = $payment->receiptDocument;
+        $this->assertNotNull($receipt);
+        $this->assertEquals('official_receipt', $receipt->document_type);
+        $this->assertEquals(Document::STATUS_ISSUED, $receipt->status);
+        $this->assertEquals('WS-REC-2026-00001', $receipt->official_number);
+        $this->assertEquals($customer->id, $receipt->customer_id);
+    }
+
     public function test_multi_invoice_payment(): void
     {
         // Create two invoices
@@ -199,6 +291,19 @@ class DocumentWorkflowTest extends TestCase
         $this->assertCount(3, $voided->statusHistory);
     }
 
+    public function test_void_requires_reason(): void
+    {
+        $draft = $this->workflow->createDraft([
+            'company_id' => $this->company->id,
+            'document_type' => 'invoice',
+            'items' => $this->createDraftItems(),
+        ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Void reason is required');
+        $this->workflow->void($draft->id, '   ');
+    }
+
     public function test_cannot_void_already_voided(): void
     {
         $draft = $this->workflow->createDraft([
@@ -231,6 +336,36 @@ class DocumentWorkflowTest extends TestCase
         // Snapshot must be unchanged
         $this->assertEquals($snapshot, $issued->fresh()->issuer_snapshot_json);
         $this->assertNotEquals('Changed Name', $issued->fresh()->issuer_snapshot_json['name']);
+    }
+
+    public function test_issued_render_data_uses_snapshots_not_live_company_profile(): void
+    {
+        $draft = $this->workflow->createDraft([
+            'company_id' => $this->company->id,
+            'document_type' => 'invoice',
+            'items' => $this->createDraftItems(),
+        ]);
+        $issued = $this->workflow->issue($draft->id);
+
+        $originalName = $issued->issuer_snapshot_json['name'];
+        $this->company->update(['name' => 'Changed Name']);
+
+        $data = app(PdfRenderService::class)->renderData($issued->fresh());
+        $this->assertEquals($originalName, $data['company']->name);
+        $this->assertNotEquals('Changed Name', $data['company']->name);
+    }
+
+    public function test_invalid_conversion_target_rejected(): void
+    {
+        $invoice = $this->workflow->createDraft([
+            'company_id' => $this->company->id,
+            'document_type' => 'invoice',
+            'items' => $this->createDraftItems(),
+        ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Cannot convert invoice to quotation');
+        $this->workflow->convert($invoice->id, 'quotation');
     }
 
     public function test_document_recomputes_totals_correctly(): void

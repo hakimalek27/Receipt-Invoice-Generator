@@ -13,6 +13,17 @@ use Illuminate\Support\Facades\DB;
 
 class DocumentWorkflowService
 {
+    private const CONVERSION_TARGETS = [
+        'quotation' => ['invoice', 'delivery_order'],
+        'invoice' => ['delivery_order'],
+    ];
+
+    private const RECEIVABLE_DOCUMENT_TYPES = [
+        'invoice',
+        'cash_bill',
+        'debit_note',
+    ];
+
     public function __construct(
         private readonly NumberingService $numbering,
         private readonly AmountInWordsService $amountInWords,
@@ -181,6 +192,9 @@ class DocumentWorkflowService
             if ($source->status !== Document::STATUS_DRAFT && $source->status !== Document::STATUS_ISSUED) {
                 throw new \RuntimeException("Cannot convert from status: {$source->status}");
             }
+            if (! in_array($targetType, self::CONVERSION_TARGETS[$source->document_type] ?? [], true)) {
+                throw new \RuntimeException("Cannot convert {$source->document_type} to {$targetType}");
+            }
 
             $target = Document::create([
                 'company_id' => $source->company_id,
@@ -251,6 +265,10 @@ class DocumentWorkflowService
         return DB::transaction(function () use ($documentId, $reason, $userId) {
             $document = Document::lockForUpdate()->findOrFail($documentId);
 
+            if (trim($reason) === '') {
+                throw new \RuntimeException('Void reason is required');
+            }
+
             if (! $document->isDraft() && ! $document->isIssued()) {
                 throw new \RuntimeException("Cannot void document with status: {$document->status}");
             }
@@ -286,6 +304,8 @@ class DocumentWorkflowService
                 'payment_date' => $data['payment_date'] ?? now()->toDateString(),
                 'amount' => $data['amount'],
                 'unallocated_amount' => $data['amount'],
+                'currency' => $data['currency'] ?? 'MYR',
+                'fx_rate' => $data['fx_rate'] ?? null,
                 'method' => $data['method'] ?? 'bank_transfer',
                 'reference_number' => $data['reference_number'] ?? null,
                 'notes' => $data['notes'] ?? null,
@@ -302,7 +322,11 @@ class DocumentWorkflowService
                 }
             }
 
-            return $payment->fresh(['allocations']);
+            if (! empty($data['create_official_receipt'])) {
+                $this->createOfficialReceiptForPayment($payment, $data['user_id'] ?? null);
+            }
+
+            return $payment->fresh(['allocations', 'receiptDocument']);
         });
     }
 
@@ -312,7 +336,7 @@ class DocumentWorkflowService
     public function allocatePaymentToDocument(Payment $payment, int $documentId, float $amount): PaymentAllocation
     {
         return DB::transaction(function () use ($payment, $documentId, $amount) {
-            $payment->refresh();
+            $payment = Payment::lockForUpdate()->findOrFail($payment->id);
 
             if ($amount <= 0) {
                 throw new \RuntimeException('Allocation amount must be positive');
@@ -323,9 +347,26 @@ class DocumentWorkflowService
                 );
             }
 
-            $document = Document::findOrFail($documentId);
+            $document = Document::lockForUpdate()->findOrFail($documentId);
             if ($document->company_id !== $payment->company_id) {
                 throw new \RuntimeException('Payment and document must belong to the same company');
+            }
+            if (! $document->isIssued()) {
+                throw new \RuntimeException('Payments can only be allocated to issued documents');
+            }
+            if (! in_array($document->document_type, self::RECEIVABLE_DOCUMENT_TYPES, true)) {
+                throw new \RuntimeException("Payments cannot be allocated to {$document->document_type}");
+            }
+            if ($payment->currency !== $document->currency) {
+                throw new \RuntimeException('Payment and document currency must match');
+            }
+
+            $alreadyAllocated = (float) $document->paymentAllocations()->sum('amount');
+            $outstanding = round((float) $document->grand_total - $alreadyAllocated, 2);
+            if ($amount > $outstanding) {
+                throw new \RuntimeException(
+                    "Allocation amount {$amount} exceeds outstanding {$outstanding}"
+                );
             }
 
             $allocation = PaymentAllocation::create([
@@ -353,6 +394,51 @@ class DocumentWorkflowService
         $currentIssuer = $company->only(['name', 'code', 'address', 'phone', 'email', 'registration_number']);
 
         return $document->issuer_snapshot_json === $currentIssuer;
+    }
+
+    public function createOfficialReceiptForPayment(Payment $payment, ?int $userId = null): Document
+    {
+        return DB::transaction(function () use ($payment, $userId) {
+            $payment = Payment::with('allocations.document')
+                ->lockForUpdate()
+                ->findOrFail($payment->id);
+
+            if ($payment->receipt_document_id) {
+                return Document::findOrFail($payment->receipt_document_id);
+            }
+
+            $firstDocument = $payment->allocations->first()?->document;
+            $description = 'Payment received';
+            if ($payment->reference_number) {
+                $description .= " ({$payment->reference_number})";
+            }
+
+            $receipt = $this->createDraft([
+                'company_id' => $payment->company_id,
+                'document_type' => 'official_receipt',
+                'customer_id' => $firstDocument?->customer_id,
+                'document_date' => $payment->payment_date?->toDateString() ?? now()->toDateString(),
+                'currency' => $payment->currency,
+                'fx_rate' => $payment->fx_rate,
+                'notes' => $payment->notes,
+                'items' => [[
+                    'description' => $description,
+                    'quantity' => 1,
+                    'unit_price' => $payment->amount,
+                ]],
+            ]);
+
+            $issuedReceipt = $this->issue(
+                $receipt->id,
+                $userId,
+                $receipt->draft_hash,
+                (float) $receipt->grand_total
+            );
+
+            $payment->update(['receipt_document_id' => $issuedReceipt->id]);
+
+            return $issuedReceipt;
+        });
     }
 
     private function itemPayload(int $documentId, array $itemData, int $index): array

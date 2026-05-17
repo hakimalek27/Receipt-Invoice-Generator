@@ -13,14 +13,16 @@ class Payment extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'company_id', 'payment_date', 'amount', 'unallocated_amount',
-        'method', 'reference_number', 'notes', 'metadata',
+        'company_id', 'receipt_document_id', 'payment_date', 'amount',
+        'unallocated_amount', 'currency', 'fx_rate', 'method',
+        'reference_number', 'notes', 'metadata',
     ];
 
     protected $casts = [
         'payment_date' => 'date',
         'amount' => 'decimal:2',
         'unallocated_amount' => 'decimal:2',
+        'fx_rate' => 'decimal:8',
         'metadata' => 'array',
     ];
 
@@ -32,6 +34,11 @@ class Payment extends Model
     public function allocations(): HasMany
     {
         return $this->hasMany(PaymentAllocation::class);
+    }
+
+    public function receiptDocument(): BelongsTo
+    {
+        return $this->belongsTo(Document::class, 'receipt_document_id');
     }
 
     public function scopeForCompany($query, $companyId)

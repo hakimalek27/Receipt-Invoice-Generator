@@ -21,7 +21,7 @@ class PdfRenderService
         $paperSize = $paperSize ?? 'A4';
         $template = $this->resolveTemplate($document->document_type, $paperSize, $document->company_id);
 
-        $data = $this->prepareData($document);
+        $data = $this->renderData($document);
 
         $pdf = Pdf::loadView($template, $data)
             ->setPaper($paperSize === '60mm' ? [0, 0, 170.08, 0] : $paperSize)
@@ -98,9 +98,20 @@ class PdfRenderService
         return $template;
     }
 
-    private function prepareData(Document $document): array
+    public function renderData(Document $document): array
     {
         $document->load('items', 'company', 'customer');
+
+        $company = $document->company;
+        $customer = $document->customer;
+        if ($document->isIssued()) {
+            $company = $document->issuer_snapshot_json
+                ? $this->snapshotObject($document->issuer_snapshot_json)
+                : $company;
+            $customer = $document->buyer_snapshot_json
+                ? $this->snapshotObject($document->buyer_snapshot_json)
+                : $customer;
+        }
 
         // Use snapshotted value for issued documents; recompute only for drafts
         $amountWords = $document->amount_in_words_text;
@@ -119,8 +130,8 @@ class PdfRenderService
 
         return [
             'document' => $document,
-            'company' => $document->company,
-            'customer' => $document->customer,
+            'company' => $company,
+            'customer' => $customer,
             'items' => $document->items,
             'itemPages' => $pages,
             'totalPages' => $totalPages,
@@ -128,5 +139,10 @@ class PdfRenderService
             'isLastPage' => false,
             'pageNumber' => 1,
         ];
+    }
+
+    private function snapshotObject(array $snapshot): object
+    {
+        return json_decode(json_encode($snapshot, JSON_THROW_ON_ERROR), false, 512, JSON_THROW_ON_ERROR);
     }
 }
