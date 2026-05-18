@@ -16,6 +16,7 @@
 - R5 Telegram/DeepSeek: `27c4a50 feat(remediation): harden telegram deepseek flow`
 - R6 e-Invoice metadata readiness: `a155600 feat(remediation): expand einvoice metadata readiness`
 - R7 deployment hardening: `5547366 docs(remediation): harden deployment runbook`
+- Post-acceptance DB upgrade fix: `eec715c fix(remediation): backfill payment workflow columns`
 
 ## Final Verification
 
@@ -57,4 +58,5 @@
 - Production deployment and live Tencent smoke are not executed in this local remediation pass.
 - High-fidelity Playwright/Browsershot renderer remains the target adapter for future visual parity; current repaired renderer keeps DomPDF working as a tested legacy adapter.
 - Actual outbound Telegram message sending is not implemented; webhook currently returns the confirmation token in the API response for verification.
+- Inertia UI screens are still foundation screens; the full premium document editor, artwork upload controls, preview controls, issue confirmation UI, and detailed template management UI still need a UI completion phase.
 - MyInvois submission API remains out of v1 scope and must be designed as a later phase after official schema/code-list recheck.
