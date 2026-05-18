@@ -27,10 +27,11 @@ User: `ubuntu` (sudo), `lighthouse` (default Tencent, tidak digunakan)
 - **Process**: PM2 service `bpp` (id 0), `node /var/www/jawi.cc/bpp/build/index.js`
 - **Port**: 3001 (sekarang bind `0.0.0.0`, sepatutnya `127.0.0.1`)
 - **Folder**: `/var/www/jawi.cc/bpp/`
-- **Database**: PostgreSQL — DB `bpp` (owner `bpp_app`)
-- **Uploads**: `/var/www/jawi.cc/bpp/uploads/` (di-serve oleh nginx terus)
-- **SSL**: ❌ **EXPIRED 2026-05-11**
-- **DNS A record**: `104.21.15.86` (Cloudflare proxy aktif)
+- **Database**: PostgreSQL — DB `bpp` (owner `bpp_app`). Schema lengkap (12 tables: mosques, lecturers, evaluations, dll.). **Mosques table cuma 3 baris** — kemungkinan data masjid lain (mam, mamad test, dll.) belum migrate dari server lama. Perlu siasat.
+- **Uploads**: `/var/www/jawi.cc/bpp/uploads/` (di-serve oleh nginx terus, 9.3 MB)
+- **SSL**: ✅ Let's Encrypt valid sehingga **2026-08-16**, **auto-renew via DNS-01 (Cloudflare API)**
+- **DNS A record**: `104.21.15.86` (Cloudflare proxy aktif, Full Strict mode)
+- **Cloudflare**: SSL/TLS mode = Full (Strict), API token di `/root/.secrets/cloudflare.ini` (Zone:DNS:Edit untuk jawi.cc)
 - **systemd service**: `pm2-ubuntu.service` (enabled, active)
 
 ### 2.2 PapaPrint — `papaprint.wehdah.my`
@@ -78,8 +79,9 @@ DNS untuk dua domain Laravel **masih point ke server lama** (`43.156.242.39`). S
 
 ---
 
-## 4. Yang Sudah Dibuat (2026-05-17)
+## 4. Yang Sudah Dibuat
 
+### Hari 1 (2026-05-17)
 | # | Tindakan | Status |
 |---|---|---|
 | 1 | Tambah swap 2 GB (`/swapfile`, persist di `/etc/fstab`, swappiness=10) | ✅ |
@@ -88,6 +90,34 @@ DNS untuk dua domain Laravel **masih point ke server lama** (`43.156.242.39`). S
 | 4 | Folder backup `/var/backups/server/{db,files,configs}` (perms 700, root) | ✅ |
 | 5 | Backup manual pertama (9.8 MB total — MariaDB + Postgres + SQLite + storage + configs) | ✅ |
 | 6 | Cron `/etc/cron.d/server-backup` — **DIMATIKAN** (buang `#` bila ready) | ⏸️ |
+| 7 | Persada `.env` DB_DATABASE corrupt — diperbetulkan (Laravel + SQLite sambung balik) | ✅ |
+
+### Hari 2 (2026-05-18) — DNS cutover + SSL
+| # | Tindakan | Status |
+|---|---|---|
+| 8 | DNS tukar ke `43.133.34.55` (papaprint, persada, www.persada) | ✅ (oleh user) |
+| 9 | Persada SSL renew (Let's Encrypt) — valid sehingga 2026-08-15 | ✅ |
+| 10 | BPP SSL migrate ke Let's Encrypt + DNS-01 via Cloudflare API token | ✅ valid sehingga 2026-08-16 |
+| 11 | Pasang plugin `python3-certbot-dns-cloudflare` | ✅ |
+| 12 | Cloudflare API token disimpan di `/root/.secrets/cloudflare.ini` (perms 600, root) | ✅ |
+| 13 | Cloudflare SSL/TLS mode = **Full (Strict)** | ✅ (oleh user) |
+| 14 | Revoke + cleanup CF Origin Cert lama (folder `/etc/ssl/cloudflare` dipadam) | ✅ |
+| 15 | Auto-renew dry-run untuk semua 3 cert: PASS | ✅ |
+
+### Hari 3 (2026-05-18) — Phase A/B/C/D finishing
+| # | Tindakan | Status |
+|---|---|---|
+| 16 | Snapshot baseline state ke `~/migration-snapshot/` (10 fail) | ✅ |
+| 17 | Persada → production values (APP_ENV=production, APP_DEBUG=false, APP_URL=https://persadagemilang.my) + config/route/view cache | ✅ |
+| 18 | BPP port 3001 bind `127.0.0.1` via systemd drop-in `/etc/systemd/system/pm2-ubuntu.service.d/host-bind.conf` | ✅ |
+| 19 | Cron backup harian aktif (3:30 AM waktu server) | ✅ |
+| 20 | Investigate scheduler `papaprint:monitor-whatsapp-health` → root cause: **WhatsApp session disconnected** (perlu re-pair QR) | ✅ |
+| 21 | UFW enable (default deny in, allow 22/80/443) | ✅ |
+| 22 | SSH hardening: `PermitRootLogin no`, `PasswordAuthentication no`, `KbdInteractiveAuthentication no`, `PubkeyAuthentication yes` | ✅ |
+| 23 | Investigate BPP mosques data: **3 baris BETUL** — confirmed dari pg_dump 30-Mac yang ditinggalkan di `/home/ubuntu/migration-20260330-1215/bpp.sql` (size identik dengan finalsync). Tiada data hilang. | ✅ |
+| 24 | Server lama `43.156.242.39` — user hilang akses; tidak boleh snapshot/decommission. Server sudah unreachable. | ⚠️ Tutup |
+| 25 | **GRANT ALL PRIVILEGES** kepada `bpp_app` user di Postgres DB `bpp` — tables sebelum ini owned by `postgres` tanpa grant, menyebabkan "permission denied for table admins" pada login. Sekarang fixed + default privileges set untuk future tables. | ✅ |
+| 26 | Reset password superadmin Hakim (phone 0189030363) via bcryptjs hash + dollar-quoted SQL | ✅ |
 
 ### Detail script backup
 - **Rotasi**: simpan 14 hari, padam yang lebih lama
@@ -103,93 +133,23 @@ DNS untuk dua domain Laravel **masih point ke server lama** (`43.156.242.39`). S
 
 ---
 
-## 5. Yang TERTINGGAL (susun ikut keutamaan)
+## 5. Yang TERTINGGAL
 
-### 🔴 Mesti buat (blocking migrasi)
+### 🟠 Tindakan user (saya tak boleh buat)
 
-#### A. Betulkan Persada `.env` (saya akan tanya kebenaran asingkan)
-- Tukar baris bermasalah:
-  ```
-  DB_DATABASE=/var/www/persadagemilang/database/database.sqliteDB_DATABASE=laravel
-  ```
-  jadi:
-  ```
-  DB_DATABASE=/var/www/persadagemilang/database/database.sqlite
-  ```
-- Bila ready production: tukar juga `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL=https://persadagemilang.my`
-- Lepas tukar APP_ENV/APP_DEBUG: `php artisan config:cache && php artisan view:cache`
-- Backup current `.env` ke `/var/backups/server/configs/` sebelum tukar
+#### A. Pair semula WhatsApp untuk PapaPrint
+- Scheduler `papaprint:monitor-whatsapp-health` keep report "Whatsmeow tidak terhubung" → exit 1 setiap 5 minit (spam log)
+- whatsmeow Go service running normal (`/health` → 200 di port 4010), tapi sesi WhatsApp logged out
+- Penyelesaian: pair semula nombor pengirim WhatsApp via admin panel PapaPrint (scan QR dari handphone)
+- Setelah pair: scheduler akan exit 0, spam log berhenti automatik
 
-#### B. Tukar DNS A records (awak yang buat — di registrar/Cloudflare)
-| Domain | A record sekarang | Tukar ke |
-|---|---|---|
-| `papaprint.wehdah.my` | `43.156.242.39` | `43.133.34.55` |
-| `persadagemilang.my` | `43.156.242.39` | `43.133.34.55` |
-| `www.persadagemilang.my` | `43.156.242.39` | `43.133.34.55` |
-| `bpp.jawi.cc` (Cloudflare) | DNS-only OR setup Cloudflare Origin Cert | (lihat 5.C) |
+### 🟡 Nice-to-have (boleh tunggu lama)
 
-**Cadangan urutan**:
-1. **Persada dahulu** (cert masih valid 16 hari, ada margin) — TTL tukar low (300s) → tunggu propagate (5-10 min) → renew SSL → verify.
-2. **PapaPrint** (cert valid 45 hari, paling banyak service jalan — paling kompleks).
-3. **BPP** terakhir (cert dah expired, perlu strategi khas).
-
-#### C. Renew SSL BPP (kompleks, sebab Cloudflare proxy)
-3 pilihan:
-1. **Mod Cloudflare Full (Strict)**: gunakan **Cloudflare Origin Certificate** (15 tahun, free). Ganti cert Let's Encrypt di nginx → tak perlu certbot lagi. **Cadangan terbaik.**
-2. **Disable Cloudflare proxy** (gray cloud) buat sementara → renew certbot via HTTP-01 → enable proxy semula.
-3. **DNS-01 challenge** via Cloudflare API → certbot pakai plugin `python3-certbot-dns-cloudflare`.
-
-#### D. Bind port 3001 ke `127.0.0.1` sahaja (selepas DNS BPP siap)
-- Sekarang `0.0.0.0:3001` terdedah ke internet, bypass nginx + SSL
-- Fail BPP `.env` di `/var/www/jawi.cc/bpp/.env` — tambah/tukar `HOST=127.0.0.1` (ikut framework, mungkin pakai `LISTEN_ADDRESS`)
-- Restart: `sudo -u ubuntu pm2 restart bpp`
-- Verify: `sudo ss -tlnp | grep 3001` patut tunjuk `127.0.0.1:3001`
-
-### 🟠 Patut buat selepas DNS migrasi siap
-
-#### E. Hidupkan UFW firewall
-```bash
-sudo ufw default deny incoming
-sudo ufw default allow outgoing
-sudo ufw allow 22/tcp comment 'SSH'
-sudo ufw allow 80/tcp comment 'HTTP'
-sudo ufw allow 443/tcp comment 'HTTPS'
-# JANGAN enable lagi — tambah IP awak ke whitelist dulu:
-# sudo ufw allow from <IP-AWAK> to any port 22
-sudo ufw status verbose       # review dulu
-sudo ufw enable               # baru aktifkan
-```
-⚠️ **Pastikan IP awak masih boleh SSH selepas enable.**
-
-#### F. SSH hardening
-File `/etc/ssh/sshd_config`:
-```
-PermitRootLogin no
-PasswordAuthentication no
-PubkeyAuthentication yes
-```
-**Sebelum tukar**: pastikan `~/.ssh/authorized_keys` di server ada key awak.
-**Selepas tukar**: `sudo systemctl reload sshd`, JANGAN logout sesi semasa sehingga login baru disahkan dari terminal lain.
-
-#### G. Whitelist IP awak di fail2ban
-Edit `/etc/fail2ban/jail.local`:
-```
-ignoreip = 127.0.0.1/8 ::1 <IP-AWAK>
-```
-Reload: `sudo systemctl reload fail2ban`
-
-#### H. Aktifkan cron backup harian
-```bash
-sudo sed -i 's|^#30 3|30 3|' /etc/cron.d/server-backup
-```
-
-### 🟡 Boleh tunggu / nice-to-have
-
-- **Scheduler Persada**: kalau Persada ada job berjadual (semak `app/Console/Kernel.php`), tambah `papaprint-scheduler.service` setara untuk Persada.
-- **Siasat error `papaprint:monitor-whatsapp-health`**: tengok `php artisan papaprint:monitor-whatsapp-health -vvv` untuk root cause.
-- **Off-server backup**: rsync `/var/backups/server` ke object storage (Tencent COS, S3, dll.) — sekarang backup tinggal dalam server yang sama.
-- **Monitoring**: setup uptime monitor (UptimeRobot/healthchecks.io) untuk 3 domain.
-- **Decommission server lama** `43.156.242.39` — selepas DNS tukar siap dan diuji 1-2 minggu.
+- **Off-server backup**: sekarang backup harian tinggal dalam server yang sama. Tambah rsync ke object storage (Tencent COS, S3, BackBlaze B2, dll.) untuk disaster recovery sebenar.
+- **Monitoring uptime**: setup UptimeRobot/healthchecks.io untuk monitor 3 domain.
+- **Persada scheduler**: kalau Persada perlu cron (semak `app/Console/Kernel.php`), tambah `persada-scheduler.service` setara dengan papaprint.
+- **Persada migration verification**: sekarang hanya 4 migrations dijalankan di SQLite. Kalau Persada perlu lebih, jalankan `sudo -u www-data php8.4 artisan migrate`.
+- **Cosmetic**: bersihkan duplicate `PasswordAuthentication no` dalam `/etc/ssh/sshd_config` (sed produced 3 baris sama, tapi sshd hormat baris pertama jadi fungsi tetap betul).
 
 ---
 
