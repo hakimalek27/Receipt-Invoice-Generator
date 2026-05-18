@@ -106,7 +106,8 @@ Route::middleware(['auth', 'company'])->group(function () {
     })->name('payments.index');
 
     Route::get('/master-data', fn () => Inertia::render('MasterData/Index', [
-        'company' => request()->user()->company,
+        'company' => request()->user()->company?->append(['logo_url', 'stamp_url', 'signature_url']),
+        'bankAccounts' => request()->user()->company?->bankAccounts()->orderBy('sort_order')->get() ?? [],
         'customers' => Customer::forCompany(request()->user()->company_id)->orderBy('name')->paginate(50),
         'products' => Product::forCompany(request()->user()->company_id)->orderBy('name')->paginate(50),
         'templates' => DocumentTemplate::forCompany(request()->user()->company_id)->orderBy('document_type')->get(),

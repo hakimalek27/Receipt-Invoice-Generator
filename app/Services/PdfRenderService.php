@@ -143,9 +143,20 @@ class PdfRenderService
             'NCS' => [
                 'invoice' => 'pdf.nasceria.invoice',
                 'quotation' => 'pdf.nasceria.quotation',
+                'delivery_order' => 'pdf.nasceria.delivery_order',
+                'official_receipt' => 'pdf.nasceria.official_receipt',
             ],
             'PGG' => [
                 'invoice' => 'pdf.persada.invoice',
+                'quotation' => 'pdf.persada.quotation',
+                'delivery_order' => 'pdf.persada.delivery_order',
+                'official_receipt' => 'pdf.persada.official_receipt',
+            ],
+            'VD' => [
+                'invoice' => 'pdf.virtuedamsel.invoice',
+                'quotation' => 'pdf.virtuedamsel.quotation',
+                'delivery_order' => 'pdf.virtuedamsel.delivery_order',
+                'official_receipt' => 'pdf.virtuedamsel.official_receipt',
             ],
         ];
 
@@ -231,6 +242,24 @@ class PdfRenderService
             'payment' => $this->paymentPayload($document),
             'isLastPage' => false,
             'pageNumber' => 1,
+            'brand' => $this->brandPalette($company),
+        ];
+    }
+
+    private function brandPalette($company): array
+    {
+        if (! $company) {
+            return ['primary' => '#1a3a5c', 'secondary' => '#f0f4f8', 'accent' => '#16427a'];
+        }
+
+        $primary = data_get($company, 'brand_primary') ?: '#1a3a5c';
+        $secondary = data_get($company, 'brand_secondary') ?: '#f0f4f8';
+        $accent = data_get($company, 'brand_accent') ?: '#16427a';
+
+        return [
+            'primary' => $primary,
+            'secondary' => $secondary,
+            'accent' => $accent,
         ];
     }
 

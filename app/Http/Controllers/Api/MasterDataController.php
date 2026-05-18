@@ -44,6 +44,9 @@ class MasterDataController extends Controller
             'msic_code' => 'nullable|string|max:10',
             'business_activity_description' => 'nullable|string|max:255',
             'is_active' => 'nullable|boolean',
+            'brand_primary' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'brand_secondary' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
+            'brand_accent' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
         ]));
 
         return response()->json($company->fresh());
