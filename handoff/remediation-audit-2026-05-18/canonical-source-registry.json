@@ -1,0 +1,165 @@
+{
+  "meta": {
+    "phase": "R0",
+    "title": "Canonical Source Registry",
+    "source_pack": "handoff/claude-audit-pack-2026-05-17",
+    "manifest": "handoff/claude-audit-pack-2026-05-17/reference-manifest.json",
+    "policy": "Only canonical_for_render entries may drive v1 template implementation. non_canonical_reference_only entries may inform structure. deny_for_seeding entries must never seed production records, company data, templates, or sequences."
+  },
+  "locked_source_policy": {
+    "historical_excel_policy": "Excel lama reference only, bukan import production.",
+    "design_policy": "match + kemas",
+    "company_isolation": "Setiap company ada profile/template/numbering/sequence sendiri.",
+    "numbering_issue_rule": "Official number hanya masa issued.",
+    "einvoice_scope": "e-Invoice v1 metadata-ready sahaja.",
+    "no_cross_company_numbering": "Jangan campur numbering Wehdah, Persada, Virtue Damsel, Nas Ceria.",
+    "workspace_policy": "Workspace asal kosong, bina sistem baru."
+  },
+  "companies": {
+    "Wehdah Solution": {
+      "company_code": "WS",
+      "v1_status": "active",
+      "canonical_for_render": [
+        {
+          "file": "references/pdf/INV-SIGNAGE dec.pdf",
+          "document_types": ["invoice"],
+          "notes": "Strongest Wehdah invoice plus artwork output target; 2 pages, page 1 invoice, page 2 artwork, 1020x1320 pt."
+        },
+        {
+          "file": "references/excel/INV-ABG HANIF BANNER.xlsx",
+          "document_types": ["invoice", "quotation"],
+          "notes": "Wehdah Lao UI/Rockwell family; many artwork pages; A4 invoice plus artwork confirmation layouts."
+        },
+        {
+          "file": "references/excel/INV-ABG HANIF BANNER (1).xlsx",
+          "document_types": ["invoice", "quotation"],
+          "notes": "Same Wehdah family; ARTWORK sheet has invoice and artwork continuation pages."
+        },
+        {
+          "file": "references/excel/INV-latest.xlsx",
+          "document_types": ["invoice"],
+          "notes": "Recent Wehdah invoice/artwork examples."
+        },
+        {
+          "file": "references/excel/sham.xlsx",
+          "document_types": ["invoice"],
+          "notes": "Dense artwork invoice examples."
+        },
+        {
+          "file": "references/excel/QUOTATION MUBZ (1).xlsx",
+          "document_types": ["quotation", "invoice"],
+          "notes": "Active MUBZ quotation/invoice examples."
+        },
+        {
+          "file": "references/excel/QUOTATION MUBZ (2).xlsx",
+          "document_types": ["quotation", "invoice"],
+          "notes": "Duplicate/comparison reference for MUBZ structure."
+        }
+      ],
+      "non_canonical_reference_only": [
+        {
+          "source": "A To Z sheets inside QUOTATION MUBZ workbooks",
+          "use": "Generic structure reference for DO, cash bill, PO, notes, official receipt, and payment voucher only."
+        }
+      ],
+      "deny_for_seeding": [
+        "Historical invoice numbers",
+        "Historical customers",
+        "Historical items",
+        "Historical totals"
+      ]
+    },
+    "Nas Ceria Services": {
+      "company_code": "NCS",
+      "v1_status": "active",
+      "canonical_for_render": [
+        {
+          "file": "references/excel/Q-3118.xlsx",
+          "document_types": ["quotation", "invoice"],
+          "notes": "8 sheets; NAS Ceria/Vertex42 style; Arial; item columns No, Item/Description, Qty, Rate, Amount."
+        },
+        {
+          "file": "references/excel/Projek Masjid Muaz Bin jabal (2).xlsx",
+          "document_types": ["quotation", "invoice"],
+          "notes": "20 sheets; visible and hidden sheets; quote/invoice/costing mixed; use quote/invoice layout only."
+        }
+      ],
+      "non_canonical_reference_only": [
+        "Inventory sheets",
+        "Costing sheets",
+        "Hidden sheets not confirmed as document templates"
+      ],
+      "deny_for_seeding": [
+        "Historical bare numbers such as 3118, 2291, 1292, and 3893",
+        "Project inventory/cost rows"
+      ]
+    },
+    "Persada Gemilang Global": {
+      "company_code": "PGG",
+      "v1_status": "active",
+      "canonical_for_render": [
+        {
+          "file": "references/excel/PERSADA GEMILANG GLOBAL.xlsx",
+          "sheet": "INV 1",
+          "document_types": ["invoice"],
+          "notes": "Only INV 1 is canonical for Persada billing in this pack."
+        },
+        {
+          "file": "references/images/persada/LOGO PERSADA GEMILANG GLOBAL.jpg",
+          "asset_type": "logo",
+          "dimensions": "1048x408"
+        },
+        {
+          "file": "references/images/persada/COP PERSADA GEMILANG GLOBAL.png",
+          "asset_type": "stamp",
+          "dimensions": "294x296"
+        },
+        {
+          "file": "references/images/persada/Letterhead Persada Gemilang Global.jpg",
+          "asset_type": "letterhead",
+          "dimensions": "4963x7019"
+        }
+      ],
+      "non_canonical_reference_only": [
+        "Other workbook sheets containing A To Z, Virtue, or Wehdah data"
+      ],
+      "deny_for_seeding": [
+        "Any non-INV 1 sheet as Persada template truth",
+        "Mixed-company data inside the Persada workbook"
+      ]
+    },
+    "Virtue Damsel": {
+      "company_code": "VD",
+      "v1_status": "placeholder_only",
+      "canonical_for_render": [],
+      "missing_before_active": [
+        "final logo",
+        "stamp/chop",
+        "bank details",
+        "company registration/tax details",
+        "canonical invoice/quotation template"
+      ],
+      "deny_for_seeding": [
+        "Mixed Virtue sheets inside other company workbooks until confirmed"
+      ]
+    },
+    "Generic A To Z": {
+      "company_code": null,
+      "v1_status": "structure_reference_only",
+      "canonical_for_render": [],
+      "non_canonical_reference_only": [
+        "Generic DO",
+        "cash bill",
+        "purchase order",
+        "credit note",
+        "debit note",
+        "official receipt",
+        "payment voucher"
+      ],
+      "deny_for_seeding": [
+        "Generic A To Z as a real company",
+        "Generic A To Z numbering as production policy"
+      ]
+    }
+  }
+}

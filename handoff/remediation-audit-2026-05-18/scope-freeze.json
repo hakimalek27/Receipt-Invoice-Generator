@@ -1,0 +1,145 @@
+{
+  "meta": {
+    "phase": "R0",
+    "title": "Phase 0.5 Scope Freeze",
+    "status": "frozen_for_remediation",
+    "timezone": "Asia/Kuala_Lumpur"
+  },
+  "locked_decisions": [
+    "Excel lama reference only, bukan import production.",
+    "Design policy match + kemas.",
+    "Setiap company ada profile/template/numbering/sequence sendiri.",
+    "Official number hanya masa issued.",
+    "e-Invoice v1 metadata-ready sahaja.",
+    "Jangan campur numbering Wehdah, Persada, Virtue Damsel, Nas Ceria.",
+    "Workspace asal kosong, bina sistem baru."
+  ],
+  "v1_company_scope": {
+    "active": [
+      "Wehdah Solution",
+      "Nas Ceria Services",
+      "Persada Gemilang Global"
+    ],
+    "placeholder_only": [
+      "Virtue Damsel"
+    ],
+    "not_a_company": [
+      "Generic A To Z"
+    ]
+  },
+  "v1_document_types": {
+    "core": [
+      "invoice",
+      "quotation",
+      "official_receipt",
+      "delivery_order",
+      "cash_bill",
+      "payment_voucher",
+      "credit_note",
+      "debit_note"
+    ],
+    "metadata_ready_or_future": [
+      "refund_note",
+      "self_billed_invoice",
+      "purchase_order"
+    ],
+    "taxonomy_rules": {
+      "official_receipt": "Legal/accounting receipt document type.",
+      "thermal_60mm": "Print layout/artifact for receipts; not automatically a separate legal document type.",
+      "refund_note": "Not full v1 UI unless later approved; keep metadata/schema ready only.",
+      "self_billed_invoice": "Not full v1 UI unless later approved; keep metadata/schema ready only."
+    }
+  },
+  "numbering_policy": {
+    "rule": "Each company + document_type has its own policy and sequence.",
+    "allocation": "Official numbers are allocated only when status changes to issued.",
+    "preview": "Preview is a format example only and never reserves a sequence.",
+    "sequence_scope": [
+      "company_id",
+      "document_type",
+      "issue_year"
+    ],
+    "default_pattern": "{COMPANY}-{TYPE}-{YYYY}-{SEQ}",
+    "default_padding": 5,
+    "default_reset": "yearly",
+    "initial_examples_only": {
+      "Wehdah invoice": "WS-INV-2026-00001",
+      "Wehdah quotation": "WS-Q-2026-00001",
+      "Nas Ceria invoice": "NCS-INV-2026-00001",
+      "Persada invoice": "PGG-INV-2026-00001"
+    },
+    "manual_override": "Future-only draft/next-policy setup may be editable; issued official numbers are immutable."
+  },
+  "renderer_decision": {
+    "target": "Playwright/Browsershot/Chromium",
+    "reason": "Excel-style A4 matching, artwork placement, repeated headers, and visual regression are not reliable enough with DomPDF.",
+    "dompdf_status": "temporary legacy fallback only until Chromium renderer is implemented and verified"
+  },
+  "amount_in_words": {
+    "default_enabled": false,
+    "default_locale": "ms_MY",
+    "default_currency": "MYR",
+    "default_zero_sen_style": "SAHAJA",
+    "spelling_rule": "Use TIGA, not TUGA.",
+    "snapshot_rule": "Generated text is snapshotted on issue and never recomputed for old issued documents.",
+    "placement_rules": {
+      "Wehdah Solution": "Near existing RM/amount-in-words section before or near Grand Total.",
+      "Nas Ceria Services": "Near total footer, outside item table.",
+      "Persada Gemilang Global": "Near grand total/payment section matching INV 1 layout.",
+      "thermal_60mm": "Hidden by default unless explicitly enabled."
+    }
+  },
+  "pagination_behavior": {
+    "a4": {
+      "repeat_table_header": true,
+      "keep_rows_together_where_possible": true,
+      "long_descriptions_wrap_cleanly": true,
+      "totals_only_final_main_page": true,
+      "amount_in_words_only_final_main_page": true,
+      "bank_terms_signature_only_final_main_page": true,
+      "recommended_page_numbers": "Page X of Y",
+      "no_overlap_rule": "No item row may overlap totals, footer, signature, or stamp."
+    },
+    "wehdah_artwork_order": "Main document pages first, artwork pages after all main pages.",
+    "delivery_order_price_visibility": "Prices hidden when the selected template says price-hidden.",
+    "thermal_60mm": {
+      "width": "60mm",
+      "height": "dynamic",
+      "amount_in_words_default": "hidden"
+    }
+  },
+  "api_contract_freeze": {
+    "issue": {
+      "method": "POST",
+      "path": "/api/documents/{id}/issue",
+      "required_header": "Idempotency-Key",
+      "required_body": [
+        "draft_hash",
+        "confirmed_total"
+      ],
+      "must_reject": [
+        "hash mismatch",
+        "total mismatch",
+        "same idempotency key with different request hash",
+        "wrong company",
+        "non-draft document"
+      ]
+    },
+    "pdf_download": {
+      "method": "GET",
+      "path": "/api/documents/{id}/pdf?version=N&paper=a4|60mm",
+      "rule": "Authorized and company scoped; no raw storage paths exposed."
+    }
+  },
+  "phase_order": [
+    "R0 evidence freeze and gate artifacts",
+    "R1 backend safety",
+    "R2 workflow completeness",
+    "R3 API/UI surface",
+    "R4 PDF renderer/templates/artwork",
+    "R5 Telegram/DeepSeek",
+    "R6 e-Invoice metadata readiness",
+    "R7 deployment hardening",
+    "R8 final acceptance"
+  ]
+}
