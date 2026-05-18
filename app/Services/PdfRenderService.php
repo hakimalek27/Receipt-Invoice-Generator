@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Company;
 use App\Models\Document;
+use App\Models\Payment;
 use App\Models\PdfRender;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\File;
@@ -136,6 +137,8 @@ class PdfRenderService
             'WS' => [
                 'invoice' => 'pdf.wehdah.invoice',
                 'quotation' => 'pdf.wehdah.quotation',
+                'delivery_order' => 'pdf.wehdah.delivery_order',
+                'official_receipt' => 'pdf.wehdah.official_receipt',
             ],
             'NCS' => [
                 'invoice' => 'pdf.nasceria.invoice',
@@ -197,8 +200,18 @@ class PdfRenderService
             );
         }
 
-        // Paginate items: ~15 items per page for A4 (rough estimate)
-        $perPage = $document->document_type === 'delivery_order' ? 20 : 15;
+        // Paginate items per A4: tuned per template family.
+        // Wehdah templates carry a taller header band + customer/bracket box, so they fit
+        // ~12 invoice rows on page 1 and ~15 on continuation pages; we chunk conservatively
+        // so the "Continued on next page" footer/totals always land on the right logical page.
+        $isWehdah = ($company?->code ?? null) === 'WS';
+        if ($document->document_type === 'delivery_order') {
+            $perPage = $isWehdah ? 18 : 20;
+        } elseif ($document->document_type === 'official_receipt') {
+            $perPage = $isWehdah ? 18 : 15;
+        } else {
+            $perPage = $isWehdah ? 12 : 15;
+        }
         $pages = $document->items->chunk($perPage);
         if ($pages->isEmpty()) {
             $pages = collect([collect()]);
@@ -215,8 +228,37 @@ class PdfRenderService
             'totalPages' => $totalPages,
             'attachments' => $this->attachmentPayloads($document),
             'amountWords' => $amountWords,
+            'payment' => $this->paymentPayload($document),
             'isLastPage' => false,
             'pageNumber' => 1,
+        ];
+    }
+
+    private function paymentPayload(Document $document): ?array
+    {
+        if ($document->document_type !== 'official_receipt') {
+            return null;
+        }
+
+        $payment = Payment::with('allocations.document')
+            ->where('receipt_document_id', $document->id)
+            ->first();
+
+        if (! $payment) {
+            return null;
+        }
+
+        return [
+            'method' => $payment->method,
+            'reference_number' => $payment->reference_number,
+            'payment_date' => optional($payment->payment_date)->format('d/m/Y'),
+            'amount' => (float) $payment->amount,
+            'currency' => $payment->currency,
+            'allocations' => $payment->allocations->map(fn ($allocation) => [
+                'document_number' => $allocation->document?->official_number,
+                'document_type' => $allocation->document?->document_type,
+                'amount' => (float) $allocation->amount,
+            ])->all(),
         ];
     }
 

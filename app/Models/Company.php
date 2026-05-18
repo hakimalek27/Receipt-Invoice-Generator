@@ -43,6 +43,11 @@ class Company extends Model
         return $this->hasMany(User::class);
     }
 
+    public function bankAccounts(): HasMany
+    {
+        return $this->hasMany(CompanyBankAccount::class)->orderBy('sort_order');
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);

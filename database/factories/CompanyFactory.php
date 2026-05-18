@@ -27,8 +27,15 @@ class CompanyFactory extends Factory
         return $this->state(fn () => [
             'name' => 'Wehdah Solution',
             'code' => 'WS',
-            'address' => 'Unit No: 15-13A, Jalan Wangsa, Kuala Lumpur',
-            'registration_number' => 'PG0514579-H',
+            'address' => 'Wisma UOA II, Unit No: 15-13A,',
+            'address_line_2' => 'UOA Business Centre, Jalan Pinang,',
+            'city' => 'Kuala Lumpur',
+            'state' => 'Wilayah Persekutuan',
+            'postcode' => '50450',
+            'country' => 'MY',
+            'phone' => '+6017-3123415',
+            'email' => 'wehdahsolution@gmail.com',
+            'registration_number' => '202103190949 (PG0514579-H)',
         ]);
     }
 

@@ -165,7 +165,7 @@ class DocumentWorkflowService
                 'issue_timezone_snapshot' => 'Asia/Kuala_Lumpur',
                 'issuer_snapshot_json' => $company ? $this->companySnapshot($company) : null,
                 'buyer_snapshot_json' => $customer ? $this->customerSnapshot($customer) : null,
-                'bank_snapshot_json' => $company ? $company->only(['name', 'code']) : null,
+                'bank_snapshot_json' => $company ? $this->companyBankSnapshot($company) : null,
                 'terms_snapshot_json' => ['terms' => $document->terms],
                 'tax_snapshot_json' => ['tax_total' => $document->tax_total],
                 'currency_fx_snapshot_json' => ['currency' => $document->currency, 'fx_rate' => $document->fx_rate],
@@ -459,6 +459,21 @@ class DocumentWorkflowService
         ];
     }
 
+    private function companyBankSnapshot(Company $company): array
+    {
+        return $company->bankAccounts()
+            ->where('is_active', true)
+            ->get()
+            ->map(fn ($bank) => [
+                'bank_name' => $bank->bank_name,
+                'account_number' => $bank->account_number,
+                'account_holder' => $bank->account_holder,
+                'swift_code' => $bank->swift_code,
+                'is_primary' => (bool) $bank->is_primary,
+            ])
+            ->all();
+    }
+
     private function canonicalAddress(array $parts): string
     {
         return collect($parts)
@@ -479,9 +494,31 @@ class DocumentWorkflowService
             }
 
             $firstDocument = $payment->allocations->first()?->document;
-            $description = 'Payment received';
-            if ($payment->reference_number) {
-                $description .= " ({$payment->reference_number})";
+
+            if ($payment->allocations->isNotEmpty()) {
+                $items = $payment->allocations->map(function ($allocation) use ($payment) {
+                    $sourceNumber = $allocation->document?->official_number ?? "DOC-{$allocation->document_id}";
+                    $description = "Payment for {$sourceNumber}";
+                    if ($payment->reference_number) {
+                        $description .= " (Ref: {$payment->reference_number})";
+                    }
+
+                    return [
+                        'description' => $description,
+                        'quantity' => 1,
+                        'unit_price' => (float) $allocation->amount,
+                    ];
+                })->all();
+            } else {
+                $description = 'Payment received';
+                if ($payment->reference_number) {
+                    $description .= " ({$payment->reference_number})";
+                }
+                $items = [[
+                    'description' => $description,
+                    'quantity' => 1,
+                    'unit_price' => (float) $payment->amount,
+                ]];
             }
 
             $receipt = $this->createDraft([
@@ -492,11 +529,10 @@ class DocumentWorkflowService
                 'currency' => $payment->currency,
                 'fx_rate' => $payment->fx_rate,
                 'notes' => $payment->notes,
-                'items' => [[
-                    'description' => $description,
-                    'quantity' => 1,
-                    'unit_price' => $payment->amount,
-                ]],
+                'show_amount_in_words' => true,
+                'amount_in_words_locale' => 'en_WEHDAH',
+                'amount_in_words_currency' => $payment->currency,
+                'items' => $items,
             ]);
 
             $issuedReceipt = $this->issue(

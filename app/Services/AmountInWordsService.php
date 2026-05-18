@@ -53,7 +53,45 @@ class AmountInWordsService
             return $this->convertMalay($ringgit, $sen, $zeroSenStyle, $negative);
         }
 
+        if ($locale === 'en_WEHDAH') {
+            return $this->convertWehdahEnglish($ringgit, $sen, $zeroSenStyle, $negative);
+        }
+
         return $this->convertEnglish($ringgit, $sen, $currency, $negative);
+    }
+
+    private function convertWehdahEnglish(int $ringgit, int $sen, string $zeroSenStyle, bool $negative): string
+    {
+        $parts = [];
+
+        if ($negative) {
+            $parts[] = 'NEGATIVE';
+        }
+
+        $parts[] = 'RM:';
+
+        if ($ringgit === 0) {
+            $parts[] = 'ZERO';
+        } else {
+            $parts[] = $this->insertHundredsAnd($this->numberToEnglishWords($ringgit));
+        }
+
+        if ($sen === 0) {
+            if ($zeroSenStyle !== 'NONE') {
+                $parts[] = 'ONLY';
+            }
+        } else {
+            $parts[] = 'AND';
+            $parts[] = $this->insertHundredsAnd($this->numberToEnglishWords($sen));
+            $parts[] = 'CENTS';
+        }
+
+        return strtoupper(implode(' ', $parts));
+    }
+
+    private function insertHundredsAnd(string $words): string
+    {
+        return preg_replace('/(\bhundred)\s+(?!and\b)([a-z])/i', '$1 and $2', $words);
     }
 
     private function convertMalay(int $ringgit, int $sen, string $zeroSenStyle, bool $negative): string

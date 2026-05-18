@@ -51,6 +51,20 @@ class DatabaseSeeder extends Seeder
         $this->seedPolicies($nasCeria->id, 'NCS');
         $this->seedPolicies($persada->id, 'PGG');
 
+        $wehdah->bankAccounts()->create([
+            'bank_name' => 'Hong Leong Islamic',
+            'account_number' => '18701038380',
+            'account_holder' => 'WEHDAH SOLUTION',
+            'is_primary' => true,
+            'sort_order' => 1,
+        ]);
+        $wehdah->bankAccounts()->create([
+            'bank_name' => 'Bank Islam',
+            'account_number' => '12113010769313',
+            'account_holder' => 'WEHDAH SOLUTION',
+            'sort_order' => 2,
+        ]);
+
         User::factory()->create([
             'name' => 'Super Admin', 'email' => 'super@example.com',
             'role' => 'super_admin', 'company_id' => null,
