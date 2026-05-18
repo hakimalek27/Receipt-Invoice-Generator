@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\DocumentDrafted;
+use App\Events\DocumentIssued;
+use App\Events\DocumentRejected;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\DeepSeekParserService;
@@ -29,6 +32,10 @@ class TelegramWebhookController extends Controller
 
         if (! hash_equals($expected, (string) $request->header('X-Telegram-Bot-Api-Secret-Token'))) {
             return response()->json(['error' => 'Invalid webhook secret'], 403);
+        }
+
+        if ($callback = $request->input('callback_query')) {
+            return $this->handleCallback($callback);
         }
 
         $message = $request->input('message') ?: $request->input('edited_message');
@@ -95,7 +102,14 @@ class TelegramWebhookController extends Controller
             $chatIdString,
             $telegramUserIdString
         );
-        $this->outbound->sendDraftSummary($document, $token, $chatIdString, $user->id);
+
+        event(new DocumentDrafted(
+            documentId: $document->id,
+            tokenId: $token['id'],
+            tokenPlain: $token['token'],
+            chatId: $chatIdString,
+            userId: $user->id,
+        ));
 
         return response()->json([
             'accepted' => true,
@@ -123,11 +137,100 @@ class TelegramWebhookController extends Controller
             $token->draft_hash,
             (float) $document->grand_total
         );
-        $this->outbound->sendIssuedSummary($issued, $chatId, $token->user_id);
+
+        event(new DocumentIssued(
+            documentId: $issued->id,
+            chatId: $chatId,
+            userId: $token->user_id,
+        ));
 
         return response()->json([
             'accepted' => true,
             'mode' => 'issued_after_confirmation',
+            'document_id' => $issued->id,
+            'official_number' => $issued->official_number,
+            'status' => $issued->status,
+        ]);
+    }
+
+    private function handleCallback(array $callback): JsonResponse
+    {
+        $callbackId = (string) data_get($callback, 'id', '');
+        $chatId = data_get($callback, 'message.chat.id');
+        $telegramUserId = data_get($callback, 'from.id');
+        $data = (string) data_get($callback, 'data', '');
+
+        $chatIdString = $chatId ? (string) $chatId : null;
+        $telegramUserIdString = $telegramUserId ? (string) $telegramUserId : null;
+
+        if ($chatIdString) {
+            $this->outbound->recordInbound($chatIdString, $telegramUserIdString, 'callback:'.$data);
+        }
+
+        if (! $chatIdString || ! $this->confirmation->isAuthorized($chatIdString)) {
+            $this->outbound->answerCallbackQuery($callbackId, 'Unauthorized');
+
+            return response()->json(['error' => 'Unauthorized Telegram chat'], 403);
+        }
+
+        if (! preg_match('/^(approve|reject):([A-Za-z0-9]+)$/', $data, $matches)) {
+            $this->outbound->answerCallbackQuery($callbackId, 'Unrecognized action');
+
+            return response()->json(['error' => 'Invalid callback data'], 422);
+        }
+
+        [, $action, $plainToken] = $matches;
+
+        if ($action === 'reject') {
+            $token = $this->confirmation->consumeForReject($plainToken, $chatIdString, $telegramUserIdString);
+            if (! $token) {
+                $this->outbound->answerCallbackQuery($callbackId, 'Token invalid or already used');
+
+                return response()->json(['error' => 'Invalid, expired, replayed, or stale confirmation token'], 409);
+            }
+
+            event(new DocumentRejected(
+                documentId: $token->document_id,
+                chatId: $chatIdString,
+                userId: $token->user_id,
+            ));
+
+            $this->outbound->answerCallbackQuery($callbackId, 'Rejected');
+
+            return response()->json([
+                'accepted' => true,
+                'mode' => 'rejected_after_callback',
+                'document_id' => $token->document_id,
+            ]);
+        }
+
+        // approve path
+        $token = $this->confirmation->consumeForIssue($plainToken, $chatIdString, $telegramUserIdString);
+        if (! $token) {
+            $this->outbound->answerCallbackQuery($callbackId, 'Token invalid or already used');
+
+            return response()->json(['error' => 'Invalid, expired, replayed, or stale confirmation token'], 409);
+        }
+
+        $document = $token->document;
+        $issued = $this->workflow->issue(
+            $document->id,
+            $token->user_id,
+            $token->draft_hash,
+            (float) $document->grand_total
+        );
+
+        event(new DocumentIssued(
+            documentId: $issued->id,
+            chatId: $chatIdString,
+            userId: $token->user_id,
+        ));
+
+        $this->outbound->answerCallbackQuery($callbackId, 'Approved');
+
+        return response()->json([
+            'accepted' => true,
+            'mode' => 'issued_after_callback',
             'document_id' => $issued->id,
             'official_number' => $issued->official_number,
             'status' => $issued->status,

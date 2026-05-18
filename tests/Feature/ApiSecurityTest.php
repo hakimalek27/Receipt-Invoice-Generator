@@ -200,7 +200,8 @@ class ApiSecurityTest extends TestCase
         $this->assertNotEmpty($response->json('confirmation_token'));
         $this->assertEquals(1, TelegramConfirmationToken::count());
         $this->assertEquals(1, TelegramMessage::where('direction', 'inbound')->count());
-        $this->assertEquals(1, TelegramMessage::where('direction', 'outbound')->where('status', 'skipped')->count());
+        // 2 outbound: sendMessage (text summary with keyboard) + sendDocument (PDF attachment with keyboard).
+        $this->assertEquals(2, TelegramMessage::where('direction', 'outbound')->where('status', 'skipped')->count());
     }
 
     public function test_telegram_outbound_summary_is_sent_and_redacted_in_audit_log(): void
@@ -221,7 +222,7 @@ class ApiSecurityTest extends TestCase
 
         $message = TelegramMessage::where('direction', 'outbound')->firstOrFail();
         $this->assertSame('sent', $message->status);
-        $this->assertStringContainsString('/confirm [redacted-token]', $message->payload_redacted['text']);
+        $this->assertTrue($message->payload_redacted['has_reply_markup'] ?? false);
         $this->assertStringNotContainsString($response->json('confirmation_token'), $message->payload_redacted['text']);
     }
 
