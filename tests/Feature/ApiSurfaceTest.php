@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Company;
 use App\Models\Customer;
 use App\Models\Document;
+use App\Models\DocumentTemplate;
 use App\Models\NumberingPolicy;
 use App\Models\User;
 use App\Services\DocumentWorkflowService;
@@ -20,7 +21,9 @@ class ApiSurfaceTest extends TestCase
     use RefreshDatabase;
 
     private Company $company;
+
     private User $user;
+
     private DocumentWorkflowService $workflow;
 
     protected function setUp(): void
@@ -65,7 +68,9 @@ class ApiSurfaceTest extends TestCase
             ['GET', 'api/customers'],
             ['POST', 'api/products'],
             ['GET', 'api/templates'],
+            ['PATCH', 'api/templates/{template}'],
             ['GET', 'api/numbering-policies'],
+            ['PATCH', 'api/numbering-policies/{policy}'],
             ['POST', 'api/ai/deepseek/parse-draft'],
             ['POST', 'api/telegram/webhook'],
         ] as [$method, $uri]) {
@@ -163,6 +168,26 @@ class ApiSurfaceTest extends TestCase
         $this->get('/api/products')->assertOk();
         $this->get('/api/templates')->assertOk();
         $this->get('/api/numbering-policies')->assertOk();
+
+        $template = DocumentTemplate::create([
+            'company_id' => $this->company->id,
+            'name' => 'Default Invoice',
+            'document_type' => 'invoice',
+            'paper_size' => 'A4',
+            'is_active' => true,
+        ]);
+        $this->patchJson("/api/templates/{$template->id}", [
+            'show_amount_in_words' => true,
+            'amount_in_words_label' => 'Jumlah dalam perkataan',
+        ])->assertOk()
+            ->assertJsonPath('show_amount_in_words', true);
+
+        $policy = NumberingPolicy::forCompany($this->company->id)->forType('invoice')->firstOrFail();
+        $this->patchJson("/api/numbering-policies/{$policy->id}", [
+            'prefix' => 'WS-INV',
+            'sequence_padding' => 6,
+        ])->assertOk()
+            ->assertJsonPath('prefix', 'WS-INV');
 
         $document = $this->workflow->createDraft([
             'company_id' => $this->company->id,

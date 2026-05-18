@@ -2,11 +2,14 @@
 
 namespace App\Services;
 
+use App\Models\Company;
 use App\Models\Document;
 use App\Models\PdfRender;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Symfony\Component\Process\Process;
 
 class PdfRenderService
 {
@@ -24,17 +27,9 @@ class PdfRenderService
 
         $data = $this->renderData($document);
 
-        $pdf = Pdf::loadView($template, $data)
-            ->setPaper($paperSize === '60mm' ? $this->thermalPaperBox($document) : $paperSize)
-            ->setOptions([
-                'defaultFont' => 'sans-serif',
-                'isHtml5ParserEnabled' => true,
-                'isRemoteEnabled' => false,
-            ]);
-
         $version = ($document->pdfRenders()->max('version') ?? 0) + 1;
         $filename = "documents/{$document->company_id}/{$document->id}_v{$version}.pdf";
-        $pdfBytes = $pdf->output();
+        [$pdfBytes, $pageCount] = $this->renderBytes($template, $data, $paperSize, $document);
 
         // Store in private storage
         Storage::disk('local')->put($filename, $pdfBytes);
@@ -48,11 +43,84 @@ class PdfRenderService
             'file_path' => $filename,
             'file_size' => strlen($pdfBytes),
             'sha256' => hash('sha256', $pdfBytes),
-            'page_count' => $pdf->getDomPDF()->getCanvas()->get_page_number(),
+            'page_count' => $pageCount,
             'paper_size' => $paperSize ?? 'A4',
             'template_used' => $template,
             'is_current' => true,
         ]);
+    }
+
+    private function renderBytes(string $template, array $data, string $paperSize, Document $document): array
+    {
+        if ((string) config('pdf.renderer', 'dompdf') === 'playwright') {
+            try {
+                return $this->renderWithPlaywright(view($template, $data)->render(), $paperSize, $data);
+            } catch (\Throwable $exception) {
+                if (! config('pdf.legacy_fallback', false)) {
+                    throw new \RuntimeException(
+                        'Playwright PDF renderer failed and legacy fallback is disabled: '.$exception->getMessage(),
+                        previous: $exception
+                    );
+                }
+            }
+        }
+
+        return $this->renderWithDompdf($template, $data, $paperSize, $document);
+    }
+
+    private function renderWithDompdf(string $template, array $data, string $paperSize, Document $document): array
+    {
+        $pdf = Pdf::loadView($template, $data)
+            ->setPaper($paperSize === '60mm' ? $this->thermalPaperBox($document) : $paperSize)
+            ->setOptions([
+                'defaultFont' => 'sans-serif',
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled' => false,
+            ]);
+
+        return [
+            $pdf->output(),
+            $pdf->getDomPDF()->getCanvas()->get_page_number(),
+        ];
+    }
+
+    private function renderWithPlaywright(string $html, string $paperSize, array $data): array
+    {
+        $tempDir = storage_path('app/private/pdf-render-temp');
+        File::ensureDirectoryExists($tempDir);
+
+        $base = Str::uuid()->toString();
+        $input = $tempDir.'/'.$base.'.html';
+        $output = $tempDir.'/'.$base.'.pdf';
+        file_put_contents($input, $html);
+
+        try {
+            $process = new Process([
+                (string) config('pdf.node_binary', 'node'),
+                (string) config('pdf.playwright_script'),
+                $input,
+                $output,
+                $paperSize,
+            ], base_path(), null, null, 60);
+            $process->run();
+
+            if (! $process->isSuccessful()) {
+                throw new \RuntimeException(trim($process->getErrorOutput() ?: $process->getOutput()));
+            }
+            if (! is_file($output)) {
+                throw new \RuntimeException('Playwright did not create an output PDF.');
+            }
+
+            $pageCount = max(1, (int) ($data['totalPages'] ?? 1) + count($data['attachments'] ?? []));
+
+            return [
+                file_get_contents($output),
+                $pageCount,
+            ];
+        } finally {
+            @unlink($input);
+            @unlink($output);
+        }
     }
 
     private function resolveTemplate(string $documentType, string $paperSize, int $companyId): string
@@ -61,7 +129,7 @@ class PdfRenderService
             return 'pdf.thermal_receipt';
         }
 
-        $company = \App\Models\Company::find($companyId);
+        $company = Company::find($companyId);
         $code = $company?->code;
 
         $map = [

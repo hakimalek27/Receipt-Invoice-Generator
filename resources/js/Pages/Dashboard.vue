@@ -24,6 +24,33 @@ defineProps({
 
         <div class="py-8">
             <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+                <div class="mb-6 grid gap-3 md:grid-cols-4">
+                    <Link
+                        :href="route('documents.create')"
+                        class="rounded-lg bg-gray-900 px-4 py-3 text-sm font-semibold text-white shadow-sm"
+                    >
+                        New Document
+                    </Link>
+                    <Link
+                        :href="route('payments.index')"
+                        class="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 shadow-sm"
+                    >
+                        Record Payment
+                    </Link>
+                    <Link
+                        :href="route('documents.index', { status: 'draft' })"
+                        class="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 shadow-sm"
+                    >
+                        Review Drafts
+                    </Link>
+                    <Link
+                        :href="route('master-data.index')"
+                        class="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 shadow-sm"
+                    >
+                        Master Data
+                    </Link>
+                </div>
+
                 <div class="grid gap-4 md:grid-cols-4">
                     <div
                         v-for="(value, label) in stats"
@@ -48,7 +75,11 @@ defineProps({
                             :key="document.id"
                             class="grid grid-cols-5 gap-4 px-6 py-3 text-sm"
                         >
-                            <div class="font-medium">{{ document.document_type }}</div>
+                            <div class="font-medium">
+                                <Link :href="route('documents.edit', document.id)" class="text-gray-900 underline-offset-2 hover:underline">
+                                    {{ document.document_type }}
+                                </Link>
+                            </div>
                             <div>{{ document.official_number || `Draft #${document.id}` }}</div>
                             <div>{{ document.customer?.name || '-' }}</div>
                             <div>{{ document.status }}</div>

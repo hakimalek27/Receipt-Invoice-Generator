@@ -107,6 +107,14 @@ class MasterDataController extends Controller
         return response()->json($template, 201);
     }
 
+    public function updateTemplate(Request $request, int $template): JsonResponse
+    {
+        $template = DocumentTemplate::forCompany($request->user()->company_id)->findOrFail($template);
+        $template->update($this->templateData($request, false));
+
+        return response()->json($template->fresh());
+    }
+
     public function numberingPolicies(Request $request): JsonResponse
     {
         return response()->json(NumberingPolicy::forCompany($request->user()->company_id)->orderBy('document_type')->get());
@@ -119,6 +127,14 @@ class MasterDataController extends Controller
         ]);
 
         return response()->json($policy, 201);
+    }
+
+    public function updateNumberingPolicy(Request $request, int $policy): JsonResponse
+    {
+        $policy = NumberingPolicy::forCompany($request->user()->company_id)->findOrFail($policy);
+        $policy->update($this->numberingData($request, false));
+
+        return response()->json($policy->fresh());
     }
 
     private function scopedCompany(Request $request, int $companyId): Company
@@ -166,26 +182,27 @@ class MasterDataController extends Controller
         ]);
     }
 
-    private function templateData(Request $request): array
+    private function templateData(Request $request, bool $creating = true): array
     {
         return $request->validate([
-            'name' => 'required|string|max:255',
-            'document_type' => 'required|string|max:50',
+            'name' => [$creating ? 'required' : 'sometimes', 'string', 'max:255'],
+            'document_type' => [$creating ? 'required' : 'sometimes', 'string', 'max:50'],
             'paper_size' => 'nullable|string|max:10',
             'is_default' => 'nullable|boolean',
             'show_amount_in_words' => 'nullable|boolean',
             'amount_in_words_locale' => 'nullable|string|max:20',
             'amount_in_words_currency' => 'nullable|string|size:3',
+            'amount_in_words_zero_sen_style' => 'nullable|string|max:50',
             'amount_in_words_label' => 'nullable|string|max:100',
             'amount_in_words_position' => 'nullable|string|max:100',
             'is_active' => 'nullable|boolean',
         ]);
     }
 
-    private function numberingData(Request $request): array
+    private function numberingData(Request $request, bool $creating = true): array
     {
         return $request->validate([
-            'document_type' => 'required|string|max:50',
+            'document_type' => [$creating ? 'required' : 'sometimes', 'string', 'max:50'],
             'prefix' => 'nullable|string|max:50',
             'suffix' => 'nullable|string|max:50',
             'separator' => 'nullable|string|max:5',

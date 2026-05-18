@@ -7,6 +7,7 @@ use App\Models\Document;
 use App\Models\IdempotencyKey;
 use App\Models\NumberingPolicy;
 use App\Models\TelegramConfirmationToken;
+use App\Models\TelegramMessage;
 use App\Models\User;
 use App\Services\DeepSeekParserService;
 use App\Services\DocumentWorkflowService;
@@ -21,9 +22,13 @@ class ApiSecurityTest extends TestCase
     use RefreshDatabase;
 
     protected DocumentWorkflowService $workflow;
+
     protected DeepSeekParserService $aiParser;
+
     protected TelegramConfirmationService $telegram;
+
     protected Company $company;
+
     protected User $telegramUser;
 
     protected function setUp(): void
@@ -194,6 +199,30 @@ class ApiSecurityTest extends TestCase
         $this->assertNull($document->official_number);
         $this->assertNotEmpty($response->json('confirmation_token'));
         $this->assertEquals(1, TelegramConfirmationToken::count());
+        $this->assertEquals(1, TelegramMessage::where('direction', 'inbound')->count());
+        $this->assertEquals(1, TelegramMessage::where('direction', 'outbound')->where('status', 'skipped')->count());
+    }
+
+    public function test_telegram_outbound_summary_is_sent_and_redacted_in_audit_log(): void
+    {
+        config(['services.telegram.bot_token' => 'test-bot-token']);
+        Http::fake([
+            'https://api.telegram.org/bottest-bot-token/sendMessage' => Http::response(['ok' => true], 200),
+        ]);
+
+        $response = $this->withHeader('X-Telegram-Bot-Api-Secret-Token', 'test-secret')
+            ->postJson('/api/telegram/webhook', [
+                'message' => [
+                    'chat' => ['id' => 11111],
+                    'from' => ['id' => 22222],
+                    'text' => 'invoice 1x Banner RM100',
+                ],
+            ])->assertCreated();
+
+        $message = TelegramMessage::where('direction', 'outbound')->firstOrFail();
+        $this->assertSame('sent', $message->status);
+        $this->assertStringContainsString('/confirm [redacted-token]', $message->payload_redacted['text']);
+        $this->assertStringNotContainsString($response->json('confirmation_token'), $message->payload_redacted['text']);
     }
 
     public function test_telegram_confirmation_issues_once_and_replay_is_rejected(): void

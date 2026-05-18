@@ -37,6 +37,7 @@ git clone https://github.com/hakimalek27/Receipt-Invoice-Generator.git .
 git checkout REPLACE_WITH_RELEASE_BRANCH_OR_TAG
 composer install --no-dev --optimize-autoloader
 npm ci
+npx playwright install --with-deps chromium
 npm run build
 cp .env.example .env
 php artisan key:generate
@@ -49,6 +50,7 @@ APP_ENV=production
 APP_DEBUG=false
 APP_URL=https://REPLACE_WITH_DOMAIN
 APP_TIMEZONE=Asia/Kuala_Lumpur
+SANCTUM_STATEFUL_DOMAINS=REPLACE_WITH_DOMAIN
 DB_CONNECTION=pgsql
 DB_HOST=127.0.0.1
 DB_PORT=5432
@@ -58,10 +60,15 @@ DB_PASSWORD=REPLACE_WITH_STRONG_DB_PASSWORD
 QUEUE_CONNECTION=redis
 REDIS_HOST=127.0.0.1
 FILESYSTEM_DISK=local
+PDF_RENDERER=playwright
+PDF_LEGACY_FALLBACK=false
+PDF_NODE_BINARY=node
 TELEGRAM_WEBHOOK_SECRET=REPLACE_WITH_LONG_RANDOM_SECRET
+TELEGRAM_BOT_TOKEN=REPLACE_WITH_TELEGRAM_BOT_TOKEN
 TELEGRAM_ALLOWED_CHAT_IDS=REPLACE_WITH_CHAT_ID
 TELEGRAM_CHAT_USER_MAP=REPLACE_WITH_CHAT_ID:REPLACE_WITH_APP_USER_ID
 DEEPSEEK_API_KEY=REPLACE_WITH_DEEPSEEK_KEY
+DEEPSEEK_MODEL=deepseek-chat
 ```
 
 Then run:
@@ -123,6 +130,23 @@ tail -n 100 storage/logs/queue-worker.log
 sudo supervisorctl status rig-queue:*
 ```
 
+## 4.1 PDF Renderer Gate
+
+Production PDF rendering is Playwright/Chromium. DomPDF is a legacy fallback only and should stay disabled in production unless a rollback note explicitly allows it.
+
+```bash
+npx playwright install --with-deps chromium
+php artisan rig:pdf-smoke --paper=A4
+php artisan rig:pdf-smoke --paper=60mm
+```
+
+Pass criteria:
+
+- The command writes a private PDF under `storage/app/private/documents`.
+- `PDF_RENDERER=playwright`.
+- `PDF_LEGACY_FALLBACK=false`.
+- No browser launch or font errors appear in `storage/logs/laravel.log`.
+
 ## 5. Backup and Restore
 
 `deploy/backup.sh` backs up:
@@ -173,7 +197,10 @@ sudo BACKUP_PASSPHRASE_FILE=/etc/receipt-invoice-generator/backup.passphrase /us
 - Download issued PDF by version.
 - Create payment and official receipt.
 - Telegram webhook rejects missing/wrong secret and unauthorized chat.
+- Telegram bot sends the draft summary, confirmation instruction, and issued-number message.
 - DeepSeek outage falls back to manual draft parsing.
+- DeepSeek live-key parse is tested with `php artisan rig:deepseek-smoke --require-live`.
+- Playwright renders A4 invoice, quotation, DO, official receipt, and 60mm receipt.
 - Queue worker status healthy and no failed jobs.
 - `storage/logs/laravel.log` has no new production error.
 
@@ -192,7 +219,7 @@ Rollback steps:
 cd /var/www/receipt-invoice-generator
 git checkout "$(cat .last_release)"
 composer install --no-dev --optimize-autoloader
-npm ci && npm run build
+npm ci && npx playwright install --with-deps chromium && npm run build
 php artisan migrate:rollback --step=1 --force
 php artisan config:cache
 php artisan route:cache

@@ -46,6 +46,12 @@ const showingNavigationDropdown = ref(false);
                                     Documents
                                 </NavLink>
                                 <NavLink
+                                    :href="route('payments.index')"
+                                    :active="route().current('payments.*')"
+                                >
+                                    Payments
+                                </NavLink>
+                                <NavLink
                                     :href="route('master-data.index')"
                                     :active="route().current('master-data.*')"
                                 >
@@ -163,6 +169,12 @@ const showingNavigationDropdown = ref(false);
                             :active="route().current('documents.*')"
                         >
                             Documents
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            :href="route('payments.index')"
+                            :active="route().current('payments.*')"
+                        >
+                            Payments
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
                             :href="route('master-data.index')"

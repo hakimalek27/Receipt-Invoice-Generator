@@ -1,8 +1,8 @@
 <?php
 
-use App\Http\Controllers\Api\DocumentController;
-use App\Http\Controllers\Api\DocumentAttachmentController;
 use App\Http\Controllers\Api\AiDraftController;
+use App\Http\Controllers\Api\DocumentAttachmentController;
+use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\MasterDataController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PdfDownloadController;
@@ -45,8 +45,10 @@ Route::middleware(['auth:sanctum', 'company'])->group(function () {
     Route::patch('/products/{product}', [MasterDataController::class, 'updateProduct']);
     Route::get('/templates', [MasterDataController::class, 'templates']);
     Route::post('/templates', [MasterDataController::class, 'storeTemplate']);
+    Route::patch('/templates/{template}', [MasterDataController::class, 'updateTemplate']);
     Route::get('/numbering-policies', [MasterDataController::class, 'numberingPolicies']);
     Route::post('/numbering-policies', [MasterDataController::class, 'storeNumberingPolicy']);
+    Route::patch('/numbering-policies/{policy}', [MasterDataController::class, 'updateNumberingPolicy']);
 
     Route::post('/ai/deepseek/parse-draft', [AiDraftController::class, 'parse']);
 });

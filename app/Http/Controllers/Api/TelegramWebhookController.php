@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\DeepSeekParserService;
 use App\Services\DocumentWorkflowService;
 use App\Services\TelegramConfirmationService;
+use App\Services\TelegramOutboundService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -16,6 +17,7 @@ class TelegramWebhookController extends Controller
         private readonly DeepSeekParserService $parser,
         private readonly DocumentWorkflowService $workflow,
         private readonly TelegramConfirmationService $confirmation,
+        private readonly TelegramOutboundService $outbound,
     ) {}
 
     public function handle(Request $request): JsonResponse
@@ -33,14 +35,26 @@ class TelegramWebhookController extends Controller
         $chatId = data_get($message, 'chat.id');
         $telegramUserId = data_get($message, 'from.id');
         $text = trim((string) data_get($message, 'text', ''));
+        $chatIdString = $chatId ? (string) $chatId : null;
+        $telegramUserIdString = $telegramUserId ? (string) $telegramUserId : null;
 
-        if (! $chatId || ! $this->confirmation->isAuthorized((string) $chatId)) {
+        if ($chatIdString) {
+            $this->outbound->recordInbound($chatIdString, $telegramUserIdString, $text);
+        }
+
+        if (! $chatIdString || ! $this->confirmation->isAuthorized($chatIdString)) {
+            if ($chatIdString) {
+                $this->outbound->recordInbound($chatIdString, $telegramUserIdString, $text, 'rejected', null, null, null, 'Unauthorized Telegram chat');
+            }
+
             return response()->json(['error' => 'Unauthorized Telegram chat'], 403);
         }
 
-        $userId = $this->confirmation->userIdForChat((string) $chatId);
+        $userId = $this->confirmation->userIdForChat($chatIdString);
         $user = $userId ? User::find($userId) : null;
         if (! $user || ! $user->company_id) {
+            $this->outbound->recordInbound($chatIdString, $telegramUserIdString, $text, 'rejected', null, $userId, null, 'Telegram chat is not mapped to a company user');
+
             return response()->json(['error' => 'Telegram chat is not mapped to a company user'], 403);
         }
 
@@ -49,11 +63,18 @@ class TelegramWebhookController extends Controller
         }
 
         if (preg_match('/^\/?confirm\s+([A-Za-z0-9]+)$/', $text, $matches)) {
-            return $this->confirmIssue($matches[1], (string) $chatId, $telegramUserId ? (string) $telegramUserId : null);
+            return $this->confirmIssue($matches[1], $chatIdString, $telegramUserIdString);
         }
 
         $draftPayload = $this->parser->parseIntent($text, $user->company_id);
         if (! empty($draftPayload['error'])) {
+            $this->outbound->sendText(
+                $chatIdString,
+                'Draft could not be parsed safely. Please create it manually in the system.',
+                $user->company_id,
+                $user->id
+            );
+
             return response()->json([
                 'accepted' => true,
                 'mode' => 'manual_fallback',
@@ -71,9 +92,10 @@ class TelegramWebhookController extends Controller
         $token = $this->confirmation->generateToken(
             $document,
             $user,
-            (string) $chatId,
-            $telegramUserId ? (string) $telegramUserId : null
+            $chatIdString,
+            $telegramUserIdString
         );
+        $this->outbound->sendDraftSummary($document, $token, $chatIdString, $user->id);
 
         return response()->json([
             'accepted' => true,
@@ -101,6 +123,7 @@ class TelegramWebhookController extends Controller
             $token->draft_hash,
             (float) $document->grand_total
         );
+        $this->outbound->sendIssuedSummary($issued, $chatId, $token->user_id);
 
         return response()->json([
             'accepted' => true,
