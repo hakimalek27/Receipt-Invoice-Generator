@@ -5,9 +5,20 @@ import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import NavLink from '@/Components/NavLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
-import { Link } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 
 const showingNavigationDropdown = ref(false);
+
+const page = usePage();
+
+function switchCompany(event) {
+    const id = event.target.value;
+    router.post(
+        route('switch-company'),
+        { company_id: id ? Number(id) : null },
+        { preserveScroll: true }
+    );
+}
 </script>
 
 <template>
@@ -61,6 +72,27 @@ const showingNavigationDropdown = ref(false);
                         </div>
 
                         <div class="hidden sm:ms-6 sm:flex sm:items-center">
+                            <!-- Company Switcher (super admin only) -->
+                            <div
+                                v-if="page.props.companySwitcher?.isSuperAdmin"
+                                class="me-3 flex items-center gap-2"
+                            >
+                                <label class="text-xs font-medium text-gray-500">Company:</label>
+                                <select
+                                    :value="page.props.companySwitcher.activeCompanyId ?? ''"
+                                    @change="switchCompany"
+                                    class="rounded-md border-gray-300 py-1.5 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                >
+                                    <option
+                                        v-for="c in page.props.companySwitcher.companies"
+                                        :key="c.id"
+                                        :value="c.id"
+                                    >
+                                        {{ c.name }}
+                                    </option>
+                                </select>
+                            </div>
+
                             <!-- Settings Dropdown -->
                             <div class="relative ms-3">
                                 <Dropdown align="right" width="48">

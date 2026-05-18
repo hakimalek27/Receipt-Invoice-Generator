@@ -45,4 +45,19 @@ class User extends Authenticatable
     {
         return $query->where('company_id', $companyId);
     }
+
+    /**
+     * Effective company id used to scope reads/writes.
+     * - Regular users: their own company_id
+     * - Super admins: the active company id stored in session (set via switch-company),
+     *   falling back to null which means "all companies" for read scopes.
+     */
+    public function effectiveCompanyId(): ?int
+    {
+        if (! $this->isSuperAdmin()) {
+            return $this->company_id;
+        }
+        $active = session('active_company_id');
+        return is_int($active) || (is_string($active) && ctype_digit($active)) ? (int) $active : null;
+    }
 }

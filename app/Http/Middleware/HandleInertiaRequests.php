@@ -29,10 +29,26 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $user = $request->user();
+
+        $companies = null;
+        $activeCompanyId = null;
+        if ($user && $user->isSuperAdmin()) {
+            $companies = \App\Models\Company::where('is_active', true)
+                ->orderBy('id')
+                ->get(['id', 'name', 'code']);
+            $activeCompanyId = $user->company_id;
+        }
+
         return [
             ...parent::share($request),
             'auth' => [
-                'user' => $request->user(),
+                'user' => $user,
+            ],
+            'companySwitcher' => [
+                'isSuperAdmin' => (bool) ($user?->isSuperAdmin()),
+                'companies' => $companies,
+                'activeCompanyId' => $activeCompanyId,
             ],
         ];
     }

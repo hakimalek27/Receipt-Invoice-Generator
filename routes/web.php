@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SwitchCompanyController;
 use App\Models\Customer;
 use App\Models\Document;
 use App\Models\DocumentTemplate;
@@ -117,6 +118,8 @@ Route::middleware(['auth', 'company'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    Route::post('/switch-company', [SwitchCompanyController::class, 'store'])->name('switch-company');
 });
 
 require __DIR__.'/auth.php';
