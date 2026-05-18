@@ -36,6 +36,9 @@ class CompanyFactory extends Factory
             'phone' => '+6017-3123415',
             'email' => 'wehdahsolution@gmail.com',
             'registration_number' => '202103190949 (PG0514579-H)',
+            'brand_primary' => '#1a3a5c',
+            'brand_secondary' => '#f0f4f8',
+            'brand_accent' => '#16427a',
         ]);
     }
 
@@ -46,6 +49,9 @@ class CompanyFactory extends Factory
             'code' => 'NCS',
             'address' => '14-1, 1st Floor, Jalan Wangsa Budi 1, Taman Wangsa Melawati, 53300 Kuala Lumpur',
             'registration_number' => '003035718-X',
+            'brand_primary' => '#0b6e4f',
+            'brand_secondary' => '#e6f2ee',
+            'brand_accent' => '#08543d',
         ]);
     }
 
@@ -55,6 +61,21 @@ class CompanyFactory extends Factory
             'name' => 'Persada Gemilang Global',
             'code' => 'PGG',
             'is_active' => true,
+            'brand_primary' => '#5d3a9b',
+            'brand_secondary' => '#efeaf7',
+            'brand_accent' => '#3f2872',
+        ]);
+    }
+
+    public function virtueDamsel(): static
+    {
+        return $this->state(fn () => [
+            'name' => 'Virtue Damsel',
+            'code' => 'VD',
+            'is_active' => true,
+            'brand_primary' => '#c2185b',
+            'brand_secondary' => '#fce4ec',
+            'brand_accent' => '#880e4f',
         ]);
     }
 

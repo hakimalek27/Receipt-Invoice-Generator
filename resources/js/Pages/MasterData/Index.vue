@@ -6,6 +6,7 @@ import { computed, reactive, ref } from 'vue';
 
 const props = defineProps({
     company: Object,
+    bankAccounts: Array,
     customers: Object,
     products: Object,
     templates: Array,
@@ -34,6 +35,30 @@ const companyForm = reactive({
     country: props.company?.country || 'MY',
     phone: props.company?.phone || '',
     email: props.company?.email || '',
+});
+
+const brandForm = reactive({
+    brand_primary: props.company?.brand_primary || '#1a3a5c',
+    brand_secondary: props.company?.brand_secondary || '#f0f4f8',
+    brand_accent: props.company?.brand_accent || '#16427a',
+});
+
+const brandingAssets = reactive({
+    logo: { url: props.company?.logo_url || null, path: props.company?.logo_path || null },
+    stamp: { url: props.company?.stamp_url || null, path: props.company?.stamp_path || null },
+    signature: { url: props.company?.signature_url || null, path: props.company?.signature_path || null },
+});
+
+const bankRows = ref([...(props.bankAccounts || [])]);
+
+const bankForm = reactive({
+    bank_name: '',
+    account_number: '',
+    account_holder: '',
+    swift_code: '',
+    is_primary: false,
+    sort_order: 0,
+    is_active: true,
 });
 
 const customerRows = ref([...(props.customers?.data || props.customers || [])]);
@@ -94,6 +119,8 @@ const numberingForm = reactive({
 
 const tabs = [
     ['company', 'Company'],
+    ['branding', 'Branding'],
+    ['bank-accounts', 'Bank Accounts'],
     ['customers', 'Customers'],
     ['products', 'Products'],
     ['templates', 'Templates'],
@@ -214,6 +241,99 @@ async function createNumbering() {
     });
 }
 
+async function saveBrandColors() {
+    await run(async () => {
+        const updated = await apiFetch(`/api/companies/${props.company.id}`, {
+            method: 'PATCH',
+            body: brandForm,
+        });
+        Object.assign(brandForm, {
+            brand_primary: updated.brand_primary,
+            brand_secondary: updated.brand_secondary,
+            brand_accent: updated.brand_accent,
+        });
+        notice.value = 'Brand colors saved.';
+    });
+}
+
+async function uploadBranding(kind, fileEvent) {
+    const file = fileEvent.target.files?.[0];
+    if (!file) return;
+    await run(async () => {
+        const form = new FormData();
+        form.append('file', file);
+        const result = await apiFetch(`/api/companies/${props.company.id}/branding/${kind}`, {
+            method: 'POST',
+            body: form,
+        });
+        brandingAssets[kind].url = result.url;
+        brandingAssets[kind].path = result.path;
+        notice.value = `${kind.charAt(0).toUpperCase() + kind.slice(1)} uploaded.`;
+        fileEvent.target.value = '';
+    });
+}
+
+async function removeBranding(kind) {
+    if (!brandingAssets[kind].path) return;
+    if (!window.confirm(`Remove company ${kind}?`)) return;
+    await run(async () => {
+        await apiFetch(`/api/companies/${props.company.id}/branding/${kind}`, {
+            method: 'DELETE',
+        });
+        brandingAssets[kind].url = null;
+        brandingAssets[kind].path = null;
+        notice.value = `${kind.charAt(0).toUpperCase() + kind.slice(1)} removed.`;
+    });
+}
+
+async function createBankAccount() {
+    await run(async () => {
+        const account = await apiFetch(`/api/companies/${props.company.id}/bank-accounts`, {
+            method: 'POST',
+            body: bankForm,
+        });
+        bankRows.value.push(account);
+        bankRows.value.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+        Object.assign(bankForm, {
+            bank_name: '',
+            account_number: '',
+            account_holder: '',
+            swift_code: '',
+            is_primary: false,
+            sort_order: 0,
+            is_active: true,
+        });
+        notice.value = 'Bank account added.';
+    });
+}
+
+async function saveBankAccount(row) {
+    await run(async () => {
+        const updated = await apiFetch(`/api/companies/${props.company.id}/bank-accounts/${row.id}`, {
+            method: 'PATCH',
+            body: row,
+        });
+        Object.assign(row, updated);
+        if (updated.is_primary) {
+            bankRows.value.forEach((r) => {
+                if (r.id !== updated.id) r.is_primary = false;
+            });
+        }
+        notice.value = 'Bank account saved.';
+    });
+}
+
+async function deleteBankAccount(row) {
+    if (!window.confirm(`Delete bank ${row.bank_name}?`)) return;
+    await run(async () => {
+        await apiFetch(`/api/companies/${props.company.id}/bank-accounts/${row.id}`, {
+            method: 'DELETE',
+        });
+        bankRows.value = bankRows.value.filter((r) => r.id !== row.id);
+        notice.value = 'Bank account removed.';
+    });
+}
+
 async function run(callback) {
     busy.value = true;
     error.value = '';
@@ -317,6 +437,112 @@ function reset(target, values) {
                     <button type="button" class="mt-5 rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="busy" @click="saveCompany">
                         Save Company
                     </button>
+                </section>
+
+                <section v-if="activeTab === 'branding'" class="mt-6 grid gap-6 lg:grid-cols-[1fr_1fr]">
+                    <div class="bg-white p-6 shadow-sm sm:rounded-lg">
+                        <h3 class="text-sm font-semibold text-gray-900">Brand Colors</h3>
+                        <p class="mt-1 text-xs text-gray-500">Primary tints PDF headers, totals, and accents. Use hex like #1a3a5c.</p>
+                        <div class="mt-4 grid gap-3">
+                            <label class="flex items-center justify-between gap-3 text-sm font-medium text-gray-700">
+                                <span>Primary</span>
+                                <span class="inline-flex items-center gap-2">
+                                    <input v-model="brandForm.brand_primary" type="color" class="h-9 w-12 rounded border-gray-300" />
+                                    <input v-model="brandForm.brand_primary" class="w-28 rounded-md border-gray-300 text-xs" />
+                                </span>
+                            </label>
+                            <label class="flex items-center justify-between gap-3 text-sm font-medium text-gray-700">
+                                <span>Secondary</span>
+                                <span class="inline-flex items-center gap-2">
+                                    <input v-model="brandForm.brand_secondary" type="color" class="h-9 w-12 rounded border-gray-300" />
+                                    <input v-model="brandForm.brand_secondary" class="w-28 rounded-md border-gray-300 text-xs" />
+                                </span>
+                            </label>
+                            <label class="flex items-center justify-between gap-3 text-sm font-medium text-gray-700">
+                                <span>Accent</span>
+                                <span class="inline-flex items-center gap-2">
+                                    <input v-model="brandForm.brand_accent" type="color" class="h-9 w-12 rounded border-gray-300" />
+                                    <input v-model="brandForm.brand_accent" class="w-28 rounded-md border-gray-300 text-xs" />
+                                </span>
+                            </label>
+                        </div>
+                        <button type="button" class="mt-5 rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="busy" @click="saveBrandColors">
+                            Save Colors
+                        </button>
+                    </div>
+                    <div class="bg-white p-6 shadow-sm sm:rounded-lg">
+                        <h3 class="text-sm font-semibold text-gray-900">Branding Assets</h3>
+                        <p class="mt-1 text-xs text-gray-500">PNG/JPG/WEBP up to 2 MB. Logo renders top-left; signature + stamp render at signature block.</p>
+                        <div class="mt-4 grid gap-5">
+                            <div v-for="kind in ['logo', 'stamp', 'signature']" :key="kind" class="rounded-md border border-gray-200 p-3">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium capitalize text-gray-700">{{ kind }}</span>
+                                    <button v-if="brandingAssets[kind].url" type="button" class="text-xs text-red-600" :disabled="busy" @click="removeBranding(kind)">
+                                        Remove
+                                    </button>
+                                </div>
+                                <div class="mt-2 flex items-center gap-3">
+                                    <div class="flex h-16 w-24 items-center justify-center rounded border border-dashed border-gray-300 bg-gray-50">
+                                        <img v-if="brandingAssets[kind].url" :src="brandingAssets[kind].url" class="max-h-14 max-w-full" />
+                                        <span v-else class="text-xs text-gray-400">No file</span>
+                                    </div>
+                                    <input type="file" accept="image/png,image/jpeg,image/webp" class="text-xs" :disabled="busy" @change="(e) => uploadBranding(kind, e)" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section v-if="activeTab === 'bank-accounts'" class="mt-6 grid gap-6 lg:grid-cols-[420px_1fr]">
+                    <form class="bg-white p-6 shadow-sm sm:rounded-lg" @submit.prevent="createBankAccount">
+                        <h3 class="text-sm font-semibold text-gray-900">New Bank Account</h3>
+                        <p class="mt-1 text-xs text-gray-500">Used in invoice and receipt footer.</p>
+                        <div class="mt-4 grid gap-3">
+                            <input v-model="bankForm.bank_name" required placeholder="Bank name" class="rounded-md border-gray-300" />
+                            <input v-model="bankForm.account_number" required placeholder="Account number" class="rounded-md border-gray-300" />
+                            <input v-model="bankForm.account_holder" placeholder="Account holder" class="rounded-md border-gray-300" />
+                            <input v-model="bankForm.swift_code" placeholder="SWIFT code (optional)" class="rounded-md border-gray-300" />
+                            <div class="grid grid-cols-2 gap-3">
+                                <input v-model.number="bankForm.sort_order" type="number" min="0" max="999" placeholder="Sort order" class="rounded-md border-gray-300" />
+                                <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                                    <input v-model="bankForm.is_primary" type="checkbox" class="rounded border-gray-300" />
+                                    Primary
+                                </label>
+                            </div>
+                        </div>
+                        <button type="submit" class="mt-4 rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="busy">
+                            Add Bank
+                        </button>
+                    </form>
+                    <div class="overflow-hidden bg-white shadow-sm sm:rounded-lg">
+                        <div class="border-b px-5 py-3 text-sm font-semibold text-gray-900">Bank Accounts</div>
+                        <div v-if="bankRows.length === 0" class="px-5 py-6 text-center text-sm text-gray-500">No bank accounts yet.</div>
+                        <div v-for="row in bankRows" :key="row.id" class="border-b px-5 py-3 last:border-b-0">
+                            <div class="grid gap-2 md:grid-cols-3">
+                                <input v-model="row.bank_name" class="rounded-md border-gray-300 text-sm" />
+                                <input v-model="row.account_number" class="rounded-md border-gray-300 text-sm" />
+                                <input v-model="row.account_holder" placeholder="Account holder" class="rounded-md border-gray-300 text-sm" />
+                                <input v-model="row.swift_code" placeholder="SWIFT" class="rounded-md border-gray-300 text-sm" />
+                                <input v-model.number="row.sort_order" type="number" min="0" max="999" class="rounded-md border-gray-300 text-sm" />
+                            </div>
+                            <div class="mt-3 flex items-center gap-4 text-xs text-gray-700">
+                                <label class="inline-flex items-center gap-2">
+                                    <input v-model="row.is_primary" type="checkbox" class="rounded border-gray-300" />
+                                    Primary
+                                </label>
+                                <label class="inline-flex items-center gap-2">
+                                    <input v-model="row.is_active" type="checkbox" class="rounded border-gray-300" />
+                                    Active
+                                </label>
+                                <button type="button" class="ml-auto rounded-md border border-gray-300 px-3 py-1.5 font-medium" :disabled="busy" @click="saveBankAccount(row)">
+                                    Save
+                                </button>
+                                <button type="button" class="rounded-md border border-red-300 px-3 py-1.5 font-medium text-red-600" :disabled="busy" @click="deleteBankAccount(row)">
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </section>
 
                 <section v-if="activeTab === 'customers'" class="mt-6 grid gap-6 lg:grid-cols-[420px_1fr]">

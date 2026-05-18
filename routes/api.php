@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\AiDraftController;
+use App\Http\Controllers\Api\CompanyBankAccountController;
+use App\Http\Controllers\Api\CompanyBrandingController;
 use App\Http\Controllers\Api\DocumentAttachmentController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\MasterDataController;
@@ -37,6 +39,16 @@ Route::middleware(['auth:sanctum', 'company'])->group(function () {
 
     Route::get('/companies', [MasterDataController::class, 'companies']);
     Route::patch('/companies/{company}', [MasterDataController::class, 'updateCompany']);
+    Route::post('/companies/{company}/branding/{kind}', [CompanyBrandingController::class, 'upload'])
+        ->whereIn('kind', ['logo', 'stamp', 'signature']);
+    Route::delete('/companies/{company}/branding/{kind}', [CompanyBrandingController::class, 'destroy'])
+        ->whereIn('kind', ['logo', 'stamp', 'signature']);
+
+    Route::get('/companies/{company}/bank-accounts', [CompanyBankAccountController::class, 'index']);
+    Route::post('/companies/{company}/bank-accounts', [CompanyBankAccountController::class, 'store']);
+    Route::patch('/companies/{company}/bank-accounts/{account}', [CompanyBankAccountController::class, 'update']);
+    Route::delete('/companies/{company}/bank-accounts/{account}', [CompanyBankAccountController::class, 'destroy']);
+
     Route::get('/customers', [MasterDataController::class, 'customers']);
     Route::post('/customers', [MasterDataController::class, 'storeCustomer']);
     Route::patch('/customers/{customer}', [MasterDataController::class, 'updateCustomer']);
