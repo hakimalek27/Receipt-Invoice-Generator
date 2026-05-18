@@ -36,6 +36,22 @@ function useDocumentTotal() {
     form.currency = selectedDocument.value.currency || 'MYR';
 }
 
+async function generateReceipt(payment) {
+    busy.value = true;
+    error.value = '';
+    message.value = '';
+    try {
+        const updated = await apiFetch(`/api/payments/${payment.id}/generate-receipt`, { method: 'POST' });
+        const idx = localPayments.value.findIndex((p) => p.id === updated.id);
+        if (idx >= 0) localPayments.value[idx] = updated;
+        message.value = `Receipt ${updated.receipt_document?.official_number ?? '(generated)'} created.`;
+    } catch (exception) {
+        error.value = exception.message;
+    } finally {
+        busy.value = false;
+    }
+}
+
 async function recordPayment() {
     busy.value = true;
     error.value = '';
@@ -153,6 +169,7 @@ async function recordPayment() {
                                 <th class="px-4 py-3">Reference</th>
                                 <th class="px-4 py-3">Receipt</th>
                                 <th class="px-4 py-3 text-right">Amount</th>
+                                <th class="px-4 py-3 text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
@@ -166,9 +183,18 @@ async function recordPayment() {
                                     <span v-else>-</span>
                                 </td>
                                 <td class="px-4 py-3 text-right">{{ money(payment.amount, payment.currency) }}</td>
+                                <td class="px-4 py-3 text-right">
+                                    <button v-if="!payment.receipt_document_id"
+                                            :disabled="busy"
+                                            @click="generateReceipt(payment)"
+                                            class="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 disabled:opacity-50">
+                                        Generate Receipt
+                                    </button>
+                                    <span v-else class="text-xs text-gray-400">&mdash;</span>
+                                </td>
                             </tr>
                             <tr v-if="localPayments.length === 0">
-                                <td colspan="4" class="px-4 py-10 text-center text-gray-500">No payments yet.</td>
+                                <td colspan="5" class="px-4 py-10 text-center text-gray-500">No payments yet.</td>
                             </tr>
                         </tbody>
                     </table>

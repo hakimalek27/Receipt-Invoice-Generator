@@ -54,4 +54,24 @@ class PaymentController extends Controller
 
         return response()->json($payment);
     }
+
+    public function generateReceipt(Request $request, int $payment): JsonResponse
+    {
+        $paymentModel = Payment::forCompany($request->user()->company_id)
+            ->findOrFail($payment);
+
+        if ($paymentModel->receipt_document_id) {
+            return response()->json([
+                'error' => 'Receipt already generated',
+                'receipt_document_id' => $paymentModel->receipt_document_id,
+            ], 409);
+        }
+
+        $this->workflow->createOfficialReceiptForPayment($paymentModel, $request->user()->id);
+
+        return response()->json(
+            $paymentModel->fresh(['allocations.document', 'receiptDocument']),
+            201
+        );
+    }
 }

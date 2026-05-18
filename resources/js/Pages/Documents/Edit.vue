@@ -23,12 +23,19 @@ const initialItems = props.document?.items?.length
     ? props.document.items
     : [{ description: '', quantity: 1, uom: 'unit', unit_price: 0, discount: 0, tax_type: '', tax_rate: 0, tax_amount: 0 }];
 
+// MIRRORS app/Services/DocumentWorkflowService.php::CONVERSION_TARGETS
+const CONVERSION_TARGETS = {
+    quotation: ['invoice', 'delivery_order'],
+    invoice: ['delivery_order'],
+};
+
 const form = reactive({
     id: props.document?.id ?? null,
     status: props.document?.status ?? 'draft',
     official_number: props.document?.official_number ?? null,
     document_type: props.document?.document_type ?? 'invoice',
     customer_id: props.document?.customer_id ?? '',
+    customer_name: props.document?.customer?.name ?? '',
     document_date: props.document?.document_date?.slice(0, 10) ?? today(),
     due_date: props.document?.due_date?.slice(0, 10) ?? '',
     currency: props.document?.currency ?? 'MYR',
@@ -47,6 +54,10 @@ const form = reactive({
     attachments: props.document?.attachments ?? [],
     pdf_renders: props.document?.pdf_renders ?? [],
     items: initialItems.map((item) => ({
+        product_id: item.product_id ?? null,
+        product_name: item.product_id
+            ? (props.products?.find((p) => p.id === item.product_id)?.name ?? '')
+            : '',
         description: item.description ?? '',
         section_header: item.section_header ?? '',
         image_url: item.image_url ?? '',
@@ -83,7 +94,8 @@ const confirmedTotal = ref('');
 const lastPreviewHash = ref(null);
 const artworkFile = ref(null);
 const artworkCaption = ref('');
-const convertTarget = ref('invoice');
+const availableConvertTargets = computed(() => CONVERSION_TARGETS[form.document_type] || []);
+const convertTarget = ref(availableConvertTargets.value[0] ?? 'invoice');
 const voidReason = ref('');
 
 const isDraft = computed(() => form.status === 'draft');
@@ -106,6 +118,7 @@ function applyDocument(document) {
 
 function addItem() {
     form.items.push({
+        product_id: null, product_name: '',
         description: '', section_header: '', image_url: '',
         quantity: 1, uom: 'unit', unit_price: 0, cost_unit: null,
         discount: 0, tax_type: '', tax_rate: 0, tax_amount: 0,
@@ -119,10 +132,19 @@ function removeItem(index) {
     }
 }
 
-function productPicked(index, event) {
-    const product = props.products.find((item) => String(item.id) === event.target.value);
-    if (!product) return;
+function productAutofill(index) {
+    const name = form.items[index].product_name?.trim();
+    if (!name) {
+        form.items[index].product_id = null;
+        return;
+    }
+    const product = props.products?.find((p) => p.name === name);
+    if (!product) {
+        form.items[index].product_id = null;
+        return;
+    }
     Object.assign(form.items[index], {
+        product_id: product.id,
         description: product.description || product.name,
         uom: product.uom || 'unit',
         unit_price: Number(product.default_price || 0),
@@ -133,9 +155,10 @@ function productPicked(index, event) {
 }
 
 function payload() {
+    const customerMatch = props.customers?.find((c) => c.name === form.customer_name?.trim());
     return {
         document_type: form.document_type,
-        customer_id: form.customer_id || null,
+        customer_id: customerMatch?.id ?? null,
         document_date: form.document_date,
         due_date: form.due_date || null,
         currency: form.currency,
@@ -149,13 +172,17 @@ function payload() {
         amount_in_words_currency: form.amount_in_words_currency,
         items: form.items
             .filter((item) => item.description.trim() !== '')
-            .map((item, index) => ({
-                ...item,
-                section_header: item.section_header?.trim() || null,
-                image_url: item.image_url?.trim() || null,
-                cost_unit: item.cost_unit === '' || item.cost_unit == null ? null : Number(item.cost_unit),
-                sort_order: index,
-            })),
+            .map((item, index) => {
+                const productMatch = props.products?.find((p) => p.name === item.product_name?.trim());
+                return {
+                    ...item,
+                    product_id: productMatch?.id ?? null,
+                    section_header: item.section_header?.trim() || null,
+                    image_url: item.image_url?.trim() || null,
+                    cost_unit: item.cost_unit === '' || item.cost_unit == null ? null : Number(item.cost_unit),
+                    sort_order: index,
+                };
+            }),
     };
 }
 
@@ -302,6 +329,32 @@ async function convertDocument() {
                     <div v-if="message" class="rounded border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{{ message }}</div>
                     <div v-if="error" class="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{ error }}</div>
 
+                    <div v-if="document?.converted_from || (document?.converted_to?.length)"
+                         class="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
+                        <div v-if="document.converted_from" class="flex flex-wrap items-baseline gap-1">
+                            <span class="font-medium">Source:</span>
+                            <Link :href="`/documents/${document.converted_from.id}`" class="font-mono underline">
+                                {{ document.converted_from.official_number || `Draft #${document.converted_from.id}` }}
+                            </Link>
+                            <span class="text-xs text-indigo-700">({{ document.converted_from.document_type }} · {{ document.converted_from.status }})</span>
+                        </div>
+                        <div v-if="document?.converted_to?.length" class="mt-1">
+                            <span class="font-medium">Converted to:</span>
+                            <ul class="ml-4 list-disc">
+                                <li v-for="child in document.converted_to" :key="child.id">
+                                    <Link :href="`/documents/${child.id}`" class="font-mono underline">
+                                        {{ child.official_number || `Draft #${child.id}` }}
+                                    </Link>
+                                    <span class="text-xs text-indigo-700">({{ child.document_type }} · {{ child.status }})</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <datalist id="customer-options">
+                        <option v-for="c in customers" :key="c.id" :value="c.name"></option>
+                    </datalist>
+
                     <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
                         <div class="grid gap-4 md:grid-cols-4">
                             <label class="text-sm font-medium text-gray-700">
@@ -312,10 +365,10 @@ async function convertDocument() {
                             </label>
                             <label class="text-sm font-medium text-gray-700">
                                 Customer
-                                <select v-model="form.customer_id" :disabled="!isDraft" class="mt-1 w-full rounded-md border-gray-300 text-sm">
-                                    <option value="">Walk-in Customer</option>
-                                    <option v-for="customer in customers" :key="customer.id" :value="customer.id">{{ customer.name }}</option>
-                                </select>
+                                <input v-model="form.customer_name" :disabled="!isDraft"
+                                       list="customer-options"
+                                       class="mt-1 w-full rounded-md border-gray-300 text-sm"
+                                       placeholder="Type or pick (blank = walk-in)">
                             </label>
                             <label class="text-sm font-medium text-gray-700">
                                 Date
@@ -393,10 +446,14 @@ async function convertDocument() {
                                             <input v-model="item.section_header" :disabled="!isDraft"
                                                    class="mb-2 w-full rounded-md border-amber-200 bg-amber-50 text-xs"
                                                    placeholder="Section heading (e.g. Bilik Muaazzin) &mdash; optional">
-                                            <select class="mb-2 w-full rounded-md border-gray-300 text-xs" :disabled="!isDraft" @change="productPicked(index, $event)">
-                                                <option value="">Product lookup</option>
-                                                <option v-for="product in products" :key="product.id" :value="product.id">{{ product.name }}</option>
-                                            </select>
+                                            <input v-model="item.product_name" :disabled="!isDraft"
+                                                   :list="`product-options-${index}`"
+                                                   @change="productAutofill(index)"
+                                                   class="mb-2 w-full rounded-md border-gray-300 text-xs"
+                                                   placeholder="Product lookup (type or pick)">
+                                            <datalist :id="`product-options-${index}`">
+                                                <option v-for="product in products" :key="product.id" :value="product.name"></option>
+                                            </datalist>
                                             <textarea v-model="item.description" :disabled="!isDraft" rows="2" class="w-72 rounded-md border-gray-300 text-sm" placeholder="Item description"></textarea>
                                             <input v-model="item.image_url" :disabled="!isDraft"
                                                    class="mt-2 w-72 rounded-md border-gray-300 font-mono text-xs"
@@ -490,11 +547,12 @@ async function convertDocument() {
                             <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" @click="previewPdf('60mm')">Download 60mm</button>
                         </div>
                         <div v-if="form.status === 'issued'" class="mt-5 space-y-3">
-                            <select v-model="convertTarget" class="w-full rounded-md border-gray-300 text-sm">
-                                <option value="invoice">invoice</option>
-                                <option value="delivery_order">delivery_order</option>
-                            </select>
-                            <button class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" @click="convertDocument">Convert</button>
+                            <div v-if="availableConvertTargets.length > 0" class="space-y-2">
+                                <select v-model="convertTarget" class="w-full rounded-md border-gray-300 text-sm">
+                                    <option v-for="target in availableConvertTargets" :key="target" :value="target">{{ target }}</option>
+                                </select>
+                                <button class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" @click="convertDocument">Convert to {{ convertTarget }}</button>
+                            </div>
                             <textarea v-model="voidReason" rows="2" class="w-full rounded-md border-gray-300 text-sm" placeholder="Void reason"></textarea>
                             <button class="w-full rounded-md bg-red-700 px-3 py-2 text-sm font-semibold text-white" @click="voidDocument">Void</button>
                         </div>

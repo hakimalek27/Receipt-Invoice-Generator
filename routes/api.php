@@ -36,6 +36,7 @@ Route::middleware(['auth:sanctum', 'company'])->group(function () {
     Route::get('/payments', [PaymentController::class, 'index']);
     Route::post('/payments', [PaymentController::class, 'store']);
     Route::get('/payments/{payment}', [PaymentController::class, 'show']);
+    Route::post('/payments/{payment}/generate-receipt', [PaymentController::class, 'generateReceipt']);
 
     Route::get('/companies', [MasterDataController::class, 'companies']);
     Route::patch('/companies/{company}', [MasterDataController::class, 'updateCompany']);

@@ -73,7 +73,11 @@ Route::middleware(['auth', 'company'])->group(function () {
         );
 
         return Inertia::render('Documents/Edit', [
-            'document' => $document->load('items', 'customer', 'attachments', 'pdfRenders'),
+            'document' => $document->load(
+                'items', 'customer', 'attachments', 'pdfRenders',
+                'convertedFrom:id,document_type,official_number,status',
+                'convertedTo:id,converted_from_id,document_type,official_number,status'
+            ),
             'company' => \App\Models\Company::find($document->company_id)?->only('id', 'code', 'name'),
             'customers' => Customer::forCompany(request()->user()->company_id)->active()->orderBy('name')->get(),
             'products' => Product::forCompany(request()->user()->company_id)->active()->orderBy('name')->get(),
