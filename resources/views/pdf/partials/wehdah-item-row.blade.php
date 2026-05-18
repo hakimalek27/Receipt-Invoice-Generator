@@ -23,6 +23,11 @@
 <tr>
     <td class="wehdah-items-num">{{ $index }}</td>
     <td class="wehdah-items-desc">
+        @if(!empty($item->image_url) && str_starts_with($item->image_url, 'data:image/'))
+            <img src="{{ $item->image_url }}"
+                 style="float: left; max-width: 56px; max-height: 56px; margin-right: 8px;
+                        border: 1px solid #ddd;" alt="">
+        @endif
         @foreach($headerLines as $line)
             {{ $line }}@if(!$loop->last)<br>@endif
         @endforeach

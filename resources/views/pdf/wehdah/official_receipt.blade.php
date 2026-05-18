@@ -40,6 +40,7 @@
         </thead>
         <tbody>
             @foreach($pageItems as $item)
+                @include('pdf.partials.section-header-row', ['item' => $item, 'columnCount' => 3])
                 @include('pdf.partials.wehdah-item-row', [
                     'item' => $item,
                     'index' => ($pageIndex * $itemsPerPage) + $loop->iteration,

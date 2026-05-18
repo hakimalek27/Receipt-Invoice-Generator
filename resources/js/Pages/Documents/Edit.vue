@@ -1,15 +1,23 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { apiFetch, money, today } from '@/lib/api';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import { computed, reactive, ref } from 'vue';
 
 const props = defineProps({
     document: Object,
+    company: Object,
     customers: Array,
     products: Array,
     documentTypes: Array,
 });
+
+const page = usePage();
+const isAdmin = computed(() => {
+    const role = page.props?.auth?.user?.role;
+    return role === 'admin' || role === 'super_admin';
+});
+const isPgg = computed(() => props.company?.code === 'PGG');
 
 const initialItems = props.document?.items?.length
     ? props.document.items
@@ -27,6 +35,10 @@ const form = reactive({
     fx_rate: props.document?.fx_rate ?? '',
     terms: props.document?.terms ?? '',
     notes: props.document?.notes ?? '',
+    product_line: props.document?.product_line ?? '',
+    include_arabic_salutation: props.document
+        ? Boolean(props.document.include_arabic_salutation)
+        : (props.company?.code === 'PGG'),
     show_amount_in_words: Boolean(props.document?.show_amount_in_words),
     amount_in_words_locale: props.document?.amount_in_words_locale ?? 'ms_MY',
     amount_in_words_currency: props.document?.amount_in_words_currency ?? 'MYR',
@@ -36,9 +48,12 @@ const form = reactive({
     pdf_renders: props.document?.pdf_renders ?? [],
     items: initialItems.map((item) => ({
         description: item.description ?? '',
+        section_header: item.section_header ?? '',
+        image_url: item.image_url ?? '',
         quantity: Number(item.quantity ?? 1),
         uom: item.uom ?? 'unit',
         unit_price: Number(item.unit_price ?? 0),
+        cost_unit: item.cost_unit != null ? Number(item.cost_unit) : null,
         discount: Number(item.discount ?? 0),
         tax_type: item.tax_type ?? '',
         tax_rate: Number(item.tax_rate ?? 0),
@@ -46,6 +61,18 @@ const form = reactive({
         classification_code: item.classification_code ?? '',
         tax_exemption_reason: item.tax_exemption_reason ?? '',
     })),
+});
+
+const totalMargin = computed(() => form.items.reduce((sum, item) => {
+    if (item.cost_unit == null) return sum;
+    return sum + ((Number(item.unit_price || 0) - Number(item.cost_unit || 0)) * Number(item.quantity || 0));
+}, 0));
+const marginRate = computed(() => {
+    const revenue = form.items.reduce((sum, item) => {
+        if (item.cost_unit == null) return sum;
+        return sum + (Number(item.unit_price || 0) * Number(item.quantity || 0));
+    }, 0);
+    return revenue > 0 ? (totalMargin.value / revenue) * 100 : 0;
 });
 
 const busy = ref(false);
@@ -78,7 +105,12 @@ function applyDocument(document) {
 }
 
 function addItem() {
-    form.items.push({ description: '', quantity: 1, uom: 'unit', unit_price: 0, discount: 0, tax_type: '', tax_rate: 0, tax_amount: 0, classification_code: '', tax_exemption_reason: '' });
+    form.items.push({
+        description: '', section_header: '', image_url: '',
+        quantity: 1, uom: 'unit', unit_price: 0, cost_unit: null,
+        discount: 0, tax_type: '', tax_rate: 0, tax_amount: 0,
+        classification_code: '', tax_exemption_reason: '',
+    });
 }
 
 function removeItem(index) {
@@ -110,12 +142,20 @@ function payload() {
         fx_rate: form.fx_rate || null,
         terms: form.terms || null,
         notes: form.notes || null,
+        product_line: form.product_line || null,
+        include_arabic_salutation: form.include_arabic_salutation,
         show_amount_in_words: form.show_amount_in_words,
         amount_in_words_locale: form.amount_in_words_locale,
         amount_in_words_currency: form.amount_in_words_currency,
         items: form.items
             .filter((item) => item.description.trim() !== '')
-            .map((item, index) => ({ ...item, sort_order: index })),
+            .map((item, index) => ({
+                ...item,
+                section_header: item.section_header?.trim() || null,
+                image_url: item.image_url?.trim() || null,
+                cost_unit: item.cost_unit === '' || item.cost_unit == null ? null : Number(item.cost_unit),
+                sort_order: index,
+            })),
     };
 }
 
@@ -307,6 +347,23 @@ async function convertDocument() {
                                 </select>
                             </label>
                         </div>
+                        <div v-if="isPgg" class="mt-4 grid gap-4 rounded-md border border-indigo-100 bg-indigo-50 p-4 md:grid-cols-2">
+                            <label class="text-sm font-medium text-indigo-900">
+                                Product Line
+                                <select v-model="form.product_line" :disabled="!isDraft" class="mt-1 w-full rounded-md border-indigo-200 text-sm">
+                                    <option value="">Standard</option>
+                                    <option value="scentury">SCENTURY</option>
+                                </select>
+                                <span class="mt-1 block text-xs text-indigo-700">SCENTURY: gold accent + sub-line "SCENTURY by Persada".</span>
+                            </label>
+                            <label class="flex items-start gap-2 pt-6 text-sm font-medium text-indigo-900">
+                                <input v-model="form.include_arabic_salutation" :disabled="!isDraft" type="checkbox" class="mt-0.5 rounded border-indigo-300">
+                                <span>
+                                    Include Arabic Salutation
+                                    <span class="mt-0.5 block text-xs font-normal text-indigo-700">Renders Bismillah + Assalamualaikum block atop page 1.</span>
+                                </span>
+                            </label>
+                        </div>
                     </div>
 
                     <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
@@ -322,31 +379,48 @@ async function convertDocument() {
                                         <th class="px-4 py-3">Qty</th>
                                         <th class="px-4 py-3">UOM</th>
                                         <th class="px-4 py-3">Rate</th>
+                                        <th v-if="isAdmin" class="px-4 py-3" title="Internal cost per unit (admin only, not in PDF)">Cost</th>
                                         <th class="px-4 py-3">Disc</th>
                                         <th class="px-4 py-3">Tax</th>
+                                        <th v-if="isAdmin" class="px-4 py-3 text-right" title="(Unit price &minus; cost) &times; qty">Margin</th>
                                         <th class="px-4 py-3 text-right">Total</th>
                                         <th class="px-4 py-3"></th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100">
                                     <tr v-for="(item, index) in form.items" :key="index">
-                                        <td class="px-4 py-3">
+                                        <td class="px-4 py-3 align-top">
+                                            <input v-model="item.section_header" :disabled="!isDraft"
+                                                   class="mb-2 w-full rounded-md border-amber-200 bg-amber-50 text-xs"
+                                                   placeholder="Section heading (e.g. Bilik Muaazzin) &mdash; optional">
                                             <select class="mb-2 w-full rounded-md border-gray-300 text-xs" :disabled="!isDraft" @change="productPicked(index, $event)">
                                                 <option value="">Product lookup</option>
                                                 <option v-for="product in products" :key="product.id" :value="product.id">{{ product.name }}</option>
                                             </select>
                                             <textarea v-model="item.description" :disabled="!isDraft" rows="2" class="w-72 rounded-md border-gray-300 text-sm" placeholder="Item description"></textarea>
+                                            <input v-model="item.image_url" :disabled="!isDraft"
+                                                   class="mt-2 w-72 rounded-md border-gray-300 font-mono text-xs"
+                                                   placeholder="Image data URI (data:image/png;base64,...) &mdash; optional">
                                         </td>
-                                        <td class="px-4 py-3"><input v-model.number="item.quantity" :disabled="!isDraft" type="number" step="0.0001" class="w-20 rounded-md border-gray-300 text-sm"></td>
-                                        <td class="px-4 py-3"><input v-model="item.uom" :disabled="!isDraft" class="w-20 rounded-md border-gray-300 text-sm"></td>
-                                        <td class="px-4 py-3"><input v-model.number="item.unit_price" :disabled="!isDraft || !canPrice" type="number" step="0.01" class="w-24 rounded-md border-gray-300 text-sm"></td>
-                                        <td class="px-4 py-3"><input v-model.number="item.discount" :disabled="!isDraft || !canPrice" type="number" step="0.01" class="w-20 rounded-md border-gray-300 text-sm"></td>
-                                        <td class="px-4 py-3">
+                                        <td class="px-4 py-3 align-top"><input v-model.number="item.quantity" :disabled="!isDraft" type="number" step="0.0001" class="w-20 rounded-md border-gray-300 text-sm"></td>
+                                        <td class="px-4 py-3 align-top"><input v-model="item.uom" :disabled="!isDraft" class="w-20 rounded-md border-gray-300 text-sm"></td>
+                                        <td class="px-4 py-3 align-top"><input v-model.number="item.unit_price" :disabled="!isDraft || !canPrice" type="number" step="0.01" class="w-24 rounded-md border-gray-300 text-sm"></td>
+                                        <td v-if="isAdmin" class="px-4 py-3 align-top">
+                                            <input v-model.number="item.cost_unit" :disabled="!isDraft || !canPrice" type="number" step="0.01" class="w-24 rounded-md border-amber-200 bg-amber-50 text-sm" placeholder="optional">
+                                        </td>
+                                        <td class="px-4 py-3 align-top"><input v-model.number="item.discount" :disabled="!isDraft || !canPrice" type="number" step="0.01" class="w-20 rounded-md border-gray-300 text-sm"></td>
+                                        <td class="px-4 py-3 align-top">
                                             <input v-model="item.tax_type" :disabled="!isDraft || !canPrice" class="mb-2 w-24 rounded-md border-gray-300 text-sm" placeholder="SST">
                                             <input v-model.number="item.tax_amount" :disabled="!isDraft || !canPrice" type="number" step="0.01" class="w-24 rounded-md border-gray-300 text-sm">
                                         </td>
-                                        <td class="px-4 py-3 text-right font-medium">{{ money((Number(item.quantity || 0) * Number(item.unit_price || 0)) - Number(item.discount || 0) + Number(item.tax_amount || 0), form.currency) }}</td>
-                                        <td class="px-4 py-3 text-right"><button class="text-sm font-medium text-red-700" :disabled="!isDraft" @click="removeItem(index)">Remove</button></td>
+                                        <td v-if="isAdmin" class="px-4 py-3 align-top text-right font-mono text-xs text-amber-700">
+                                            <span v-if="item.cost_unit != null && item.cost_unit !== ''">
+                                                {{ money((Number(item.unit_price || 0) - Number(item.cost_unit || 0)) * Number(item.quantity || 0), form.currency) }}
+                                            </span>
+                                            <span v-else class="text-gray-300">&mdash;</span>
+                                        </td>
+                                        <td class="px-4 py-3 align-top text-right font-medium">{{ money((Number(item.quantity || 0) * Number(item.unit_price || 0)) - Number(item.discount || 0) + Number(item.tax_amount || 0), form.currency) }}</td>
+                                        <td class="px-4 py-3 align-top text-right"><button class="text-sm font-medium text-red-700" :disabled="!isDraft" @click="removeItem(index)">Remove</button></td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -385,6 +459,14 @@ async function convertDocument() {
                 </section>
 
                 <aside class="space-y-5">
+                    <div v-if="isAdmin" class="rounded-lg border border-amber-200 bg-amber-50 p-5 shadow-sm">
+                        <h3 class="text-sm font-semibold text-amber-900">Margin <span class="text-xs font-normal text-amber-700">(admin only &middot; not in PDF)</span></h3>
+                        <dl class="mt-3 space-y-2 text-sm">
+                            <div class="flex justify-between"><dt>Total Margin</dt><dd class="font-mono">{{ money(totalMargin, form.currency) }}</dd></div>
+                            <div class="flex justify-between"><dt>Margin %</dt><dd class="font-mono">{{ marginRate.toFixed(1) }}%</dd></div>
+                        </dl>
+                        <p class="mt-3 text-xs text-amber-700">Set <code>Cost</code> per row to track margin. Customers do not see this column on the PDF.</p>
+                    </div>
                     <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
                         <h3 class="text-sm font-semibold text-gray-900">Totals</h3>
                         <dl class="mt-4 space-y-2 text-sm">

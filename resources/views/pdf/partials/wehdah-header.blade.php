@@ -37,6 +37,13 @@
                         <span class="wehdah-header-reg">({{ $company->registration_number }})</span>
                     @endif
                 </div>
+                @if(!empty($tagline))
+                    <div class="wehdah-header-tagline"
+                         style="font-size: 9pt; color: {{ $brand['accent'] ?? '#5e7187' }};
+                                font-style: italic; letter-spacing: 0.3px; margin: 1pt 0 4pt;">
+                        {{ $tagline }}
+                    </div>
+                @endif
                 @if(!empty($company->address))
                     <div class="wehdah-header-line">{{ $company->address }}</div>
                 @endif

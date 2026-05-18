@@ -49,9 +49,9 @@ class CompanyFactory extends Factory
             'code' => 'NCS',
             'address' => '14-1, 1st Floor, Jalan Wangsa Budi 1, Taman Wangsa Melawati, 53300 Kuala Lumpur',
             'registration_number' => '003035718-X',
-            'brand_primary' => '#0b6e4f',
-            'brand_secondary' => '#e6f2ee',
-            'brand_accent' => '#08543d',
+            'brand_primary' => '#1F3A5F',
+            'brand_secondary' => '#F4ECD8',
+            'brand_accent' => '#C0A062',
         ]);
     }
 
@@ -73,9 +73,9 @@ class CompanyFactory extends Factory
             'name' => 'Virtue Damsel',
             'code' => 'VD',
             'is_active' => true,
-            'brand_primary' => '#c2185b',
-            'brand_secondary' => '#fce4ec',
-            'brand_accent' => '#880e4f',
+            'brand_primary' => '#E67E22',
+            'brand_secondary' => '#FBEEE6',
+            'brand_accent' => '#16A085',
         ]);
     }
 

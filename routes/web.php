@@ -60,6 +60,7 @@ Route::middleware(['auth', 'company'])->group(function () {
 
     Route::get('/documents/create', fn () => Inertia::render('Documents/Edit', [
         'document' => null,
+        'company' => \App\Models\Company::find(request()->user()->company_id)?->only('id', 'code', 'name'),
         'customers' => Customer::forCompany(request()->user()->company_id)->active()->orderBy('name')->get(),
         'products' => Product::forCompany(request()->user()->company_id)->active()->orderBy('name')->get(),
         'documentTypes' => document_type_options(),
@@ -73,6 +74,7 @@ Route::middleware(['auth', 'company'])->group(function () {
 
         return Inertia::render('Documents/Edit', [
             'document' => $document->load('items', 'customer', 'attachments', 'pdfRenders'),
+            'company' => \App\Models\Company::find($document->company_id)?->only('id', 'code', 'name'),
             'customers' => Customer::forCompany(request()->user()->company_id)->active()->orderBy('name')->get(),
             'products' => Product::forCompany(request()->user()->company_id)->active()->orderBy('name')->get(),
             'documentTypes' => document_type_options(),

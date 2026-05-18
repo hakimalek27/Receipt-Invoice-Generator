@@ -223,6 +223,10 @@ class PdfRenderService
         } else {
             $perPage = $isWehdah ? 12 : 15;
         }
+        // Section header rows take vertical space too; trim per-page when any are present.
+        if ($document->items->whereNotNull('section_header')->isNotEmpty()) {
+            $perPage = max(8, $perPage - 1);
+        }
         $pages = $document->items->chunk($perPage);
         if ($pages->isEmpty()) {
             $pages = collect([collect()]);
@@ -256,11 +260,20 @@ class PdfRenderService
         $secondary = data_get($company, 'brand_secondary') ?: '#f0f4f8';
         $accent = data_get($company, 'brand_accent') ?: '#16427a';
 
-        return [
+        $palette = [
             'primary' => $primary,
             'secondary' => $secondary,
             'accent' => $accent,
         ];
+
+        if ((data_get($company, 'code') ?? null) === 'PGG') {
+            $gradient = resource_path('views/pdf/persada/assets/header-gradient.png');
+            if (is_file($gradient)) {
+                $palette['header_image_data_uri'] = 'data:image/png;base64,'.base64_encode(file_get_contents($gradient));
+            }
+        }
+
+        return $palette;
     }
 
     private function paymentPayload(Document $document): ?array
