@@ -12,14 +12,14 @@
     font-style: normal;
 }
 
-@page { size: A4 portrait; margin: 12mm 11mm 14mm 11mm; }
+@page { size: A4 portrait; margin: 8mm 9mm 8mm 9mm; }
 
 body {
     font-family: 'DejaVu Sans', sans-serif;
-    font-size: 10pt;
+    font-size: 9.5pt;
     color: {{ $textPrimary }};
     margin: 0;
-    line-height: 1.4;
+    line-height: 1.32;
 }
 
 /* ============ Header strip (dark blue title bar) ============ */
@@ -27,76 +27,77 @@ body {
     background: {{ $accentDark }};
     color: #ffffff;
     text-align: center;
-    padding: 9px 0 8px;
+    padding: 4px 0 4px;
     margin: -2px -2px 0 -2px;
-    border-bottom: 4px solid #ffffff;
+    border-bottom: 3px solid #ffffff;
 }
 .ws-title-strip-text {
     font-family: 'RobotoSlab', 'Times New Roman', serif;
-    font-size: 22pt;
+    font-size: 17pt;
     font-weight: 700;
-    letter-spacing: 4px;
+    letter-spacing: 3px;
     text-decoration: underline;
-    text-underline-offset: 4px;
+    text-underline-offset: 3px;
 }
 
 /* ============ Company identity block (centered) ============ */
 .ws-company-block {
     text-align: center;
-    padding: 10px 0 6px;
+    padding: 4px 0 3px;
     border-bottom: 1px solid #cccccc;
-    margin-bottom: 10px;
+    margin-bottom: 4px;
+    line-height: 1.25;
 }
 .ws-company-name {
     font-family: 'DejaVu Sans', sans-serif;
-    font-size: 13.5pt;
+    font-size: 12pt;
     font-weight: bold;
     color: {{ $accentDark }};
-    letter-spacing: 0.4px;
+    letter-spacing: 0.3px;
 }
 .ws-company-reg {
-    font-size: 9pt;
+    font-size: 8.5pt;
     font-weight: normal;
     color: {{ $textMuted }};
-    margin-left: 4px;
+    margin-left: 3px;
 }
 .ws-company-address {
     font-family: 'DejaVu Sans', sans-serif;
-    font-size: 9.5pt;
+    font-size: 8.5pt;
     color: {{ $textPrimary }};
-    line-height: 1.45;
-    margin-top: 3px;
+    line-height: 1.3;
 }
 .ws-company-contact {
     font-family: 'DejaVu Sans Condensed', 'DejaVu Sans', sans-serif;
-    font-size: 9pt;
+    font-size: 8.5pt;
     color: {{ $textPrimary }};
-    margin-top: 3px;
-    letter-spacing: 0.2px;
+    margin-top: 1px;
+    letter-spacing: 0.15px;
 }
 
 /* ============ Meta + Bill To row (two columns) ============ */
-.ws-meta-row { display: table; width: 100%; margin: 6px 0 10px; }
+.ws-meta-row { display: table; width: 100%; margin: 3px 0 6px; }
 .ws-meta-col { display: table-cell; vertical-align: top; }
-.ws-meta-col-left { width: 58%; padding-right: 10px; }
+.ws-meta-col-left { width: 58%; padding-right: 8px; }
 .ws-meta-col-right { width: 42%; }
 
 .ws-billto-label {
-    font-size: 10pt; font-weight: bold; color: {{ $accentDark }};
+    font-size: 9pt; font-weight: bold; color: {{ $accentDark }};
     border-bottom: 1px solid {{ $accentDark }};
-    padding-bottom: 2px; margin-bottom: 4px;
+    padding-bottom: 1px; margin-bottom: 3px;
 }
-.ws-billto-name { font-size: 11pt; font-weight: bold; color: {{ $textPrimary }}; }
-.ws-billto-line { font-size: 9pt; color: {{ $textPrimary }}; line-height: 1.5; }
-.ws-billto-table { width: 100%; margin-top: 4px; font-size: 9pt; }
-.ws-billto-table td { padding: 1px 4px 1px 0; vertical-align: top; }
-.ws-billto-key { font-weight: bold; width: 50px; color: {{ $textMuted }}; }
+.ws-billto-name { font-size: 10pt; font-weight: bold; color: {{ $textPrimary }}; }
+.ws-billto-line { font-size: 8.5pt; color: {{ $textPrimary }}; line-height: 1.4; }
+.ws-billto-table { width: 100%; margin-top: 2px; font-size: 8.5pt; }
+.ws-billto-table td { padding: 0 4px 0 0; vertical-align: top; line-height: 1.4; }
+.ws-billto-key { font-weight: bold; width: 42px; color: {{ $textMuted }}; }
 .ws-billto-val { color: {{ $textPrimary }}; }
 
-.ws-meta-table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+.ws-meta-table { width: 100%; border-collapse: collapse; font-size: 9pt; }
 .ws-meta-table td {
-    padding: 4px 8px;
+    padding: 3px 7px;
     border: 1px solid {{ $accentDark }};
+    line-height: 1.25;
 }
 .ws-meta-key {
     background: {{ $accentDark }};
@@ -114,29 +115,30 @@ body {
 }
 
 /* ============ Intro text (quote/OR only) ============ */
-.ws-intro { font-size: 10pt; margin: 6px 0 8px; font-style: italic; color: {{ $textPrimary }}; }
+.ws-intro { font-size: 9pt; margin: 3px 0 4px; font-style: italic; color: {{ $textPrimary }}; }
 
 /* ============ Items table ============ */
 table.ws-items {
-    width: 100%; border-collapse: collapse; margin-top: 6px;
+    width: 100%; border-collapse: collapse; margin-top: 3px;
 }
 table.ws-items thead th {
     background: {{ $accentDark }};
     color: #ffffff;
     font-family: 'DejaVu Sans', sans-serif;
-    font-size: 9.5pt;
+    font-size: 9pt;
     font-weight: bold;
-    padding: 7px 5px;
+    padding: 4px 5px;
     border: 1px solid {{ $accentDark }};
     letter-spacing: 0.3px;
 }
 table.ws-items tbody td {
-    padding: 6px 5px;
+    padding: 3px 5px;
     border-left: 1px solid #cfd7dc;
     border-right: 1px solid #cfd7dc;
     border-bottom: 1px solid #e6ebef;
-    font-size: 9.5pt;
+    font-size: 9pt;
     vertical-align: top;
+    line-height: 1.3;
 }
 table.ws-items tbody tr:last-child td { border-bottom: 1px solid {{ $accentDark }}; }
 table.ws-items .c { text-align: center; }
@@ -156,51 +158,51 @@ table.ws-items .l { text-align: left; }
     background: #eef2f7 !important;
     color: {{ $accentDark }};
     font-weight: bold;
-    font-size: 10pt;
-    padding: 6px 8px !important;
+    font-size: 9pt;
+    padding: 3px 8px !important;
     border-top: 2px solid {{ $accentDark }} !important;
 }
 
-.ws-items-bullets { margin: 4px 0 0 14px; padding: 0; }
-.ws-items-bullets li { font-size: 9pt; line-height: 1.4; }
-.ws-items-img { float: left; max-width: 56px; max-height: 56px; margin-right: 8px; border: 1px solid #ddd; }
+.ws-items-bullets { margin: 2px 0 0 14px; padding: 0; }
+.ws-items-bullets li { font-size: 8.5pt; line-height: 1.3; }
+.ws-items-img { float: left; max-width: 50px; max-height: 50px; margin-right: 6px; border: 1px solid #ddd; }
 
 /* ============ Continued / page footer ============ */
-.ws-continued { text-align: right; font-size: 8.5pt; font-style: italic; color: #888; margin: 6px 0 2px; }
+.ws-continued { text-align: right; font-size: 8pt; font-style: italic; color: #888; margin: 3px 0 1px; }
 
 /* ============ Totals block ============ */
-.ws-totals-row { display: table; width: 100%; margin-top: 4px; }
+.ws-totals-row { display: table; width: 100%; margin-top: 3px; }
 .ws-totals-words-cell, .ws-totals-grand-cell { display: table-cell; vertical-align: middle; }
-.ws-totals-words-cell { width: 60%; padding-right: 12px; }
+.ws-totals-words-cell { width: 60%; padding-right: 10px; }
 .ws-totals-grand-cell { width: 40%; }
 
-.ws-words-label { font-size: 9pt; font-weight: bold; color: {{ $accentDark }}; }
+.ws-words-label { font-size: 8.5pt; font-weight: bold; color: {{ $accentDark }}; margin-bottom: 1px; }
 .ws-words-text {
     font-family: 'DejaVu Sans', Arial, sans-serif;
-    font-size: 10pt;
+    font-size: 9.5pt;
     font-weight: bold;
     text-transform: uppercase;
     color: {{ $textPrimary }};
-    letter-spacing: 0.3px;
-    line-height: 1.4;
-    padding: 4px 6px;
+    letter-spacing: 0.25px;
+    line-height: 1.3;
+    padding: 3px 6px;
     background: #f4f7fa;
     border-left: 3px solid {{ $accentDark }};
 }
 
 .ws-grand-table { width: 100%; border-collapse: collapse; }
-.ws-grand-table td { padding: 6px 9px; }
+.ws-grand-table td { padding: 4px 8px; }
 .ws-grand-label {
     background: {{ $accentDark }};
     color: #ffffff;
     font-weight: bold;
-    font-size: 10pt;
+    font-size: 9.5pt;
     text-align: right;
     border: 2px solid {{ $accentDark }};
     font-family: 'DejaVu Sans', sans-serif;
 }
 .ws-grand-val {
-    font-size: 13pt;
+    font-size: 12pt;
     font-weight: bold;
     text-align: right;
     border: 2px solid {{ $accentDark }};
@@ -208,82 +210,82 @@ table.ws-items .l { text-align: left; }
     font-family: 'DejaVu Sans', sans-serif;
 }
 
-.ws-sub-totals { width: 50%; margin-left: auto; border-collapse: collapse; margin-bottom: 4px; }
-.ws-sub-totals td { padding: 3px 9px; font-size: 9.5pt; }
+.ws-sub-totals { width: 50%; margin-left: auto; border-collapse: collapse; margin-bottom: 2px; }
+.ws-sub-totals td { padding: 1px 8px; font-size: 9pt; }
 .ws-sub-totals td.r { text-align: right; }
 
 /* ============ Bank details strip ============ */
 .ws-bank {
     text-align: center;
-    font-size: 9pt;
-    margin: 14px 0 6px;
-    padding: 6px 8px;
+    font-size: 8.5pt;
+    margin: 6px 0 3px;
+    padding: 4px 8px;
     background: #f4f7fa;
     border-top: 1px solid {{ $accentLine }};
     border-bottom: 1px solid {{ $accentLine }};
-    line-height: 1.5;
+    line-height: 1.35;
 }
 .ws-bank-label { font-weight: bold; color: {{ $accentDark }}; }
 .ws-bank-sep { color: #888; margin: 0 6px; }
 
 /* ============ Terms ============ */
 .ws-terms {
-    font-size: 8.5pt;
+    font-size: 8pt;
     color: {{ $textPrimary }};
-    margin: 6px 0 4px;
-    line-height: 1.45;
+    margin: 3px 0 2px;
+    line-height: 1.35;
 }
 .ws-terms strong { color: {{ $accentDark }}; }
 
 /* ============ Signature block ============ */
-table.ws-signature { width: 100%; margin-top: 26px; border-collapse: collapse; }
+table.ws-signature { width: 100%; margin-top: 10px; border-collapse: collapse; }
 .ws-signature-cell {
-    width: 50%; vertical-align: bottom; padding: 4px;
+    width: 50%; vertical-align: bottom; padding: 2px;
     font-family: 'DejaVu Sans', sans-serif;
 }
-.ws-signature-cell-left { padding-right: 18px; }
-.ws-signature-cell-right { padding-left: 18px; text-align: right; }
-.ws-signature-intro { font-size: 9pt; margin-bottom: 28px; }
-.ws-signature-line { border-top: 1px solid {{ $textPrimary }}; margin-bottom: 4px; }
-.ws-signature-label { font-size: 9pt; font-weight: bold; color: {{ $textPrimary }}; }
-.ws-signature-images { position: relative; height: 60px; margin-bottom: 4px; }
-.ws-signature-images img.ws-sig-img { max-height: 50px; max-width: 160px; vertical-align: bottom; }
-.ws-signature-images img.ws-stamp-img { max-height: 60px; max-width: 80px; vertical-align: bottom; margin-left: 8px; opacity: 0.9; }
+.ws-signature-cell-left { padding-right: 14px; }
+.ws-signature-cell-right { padding-left: 14px; text-align: right; }
+.ws-signature-intro { font-size: 8.5pt; margin-bottom: 18px; }
+.ws-signature-line { border-top: 1px solid {{ $textPrimary }}; margin-bottom: 2px; }
+.ws-signature-label { font-size: 8.5pt; font-weight: bold; color: {{ $textPrimary }}; }
+.ws-signature-images { position: relative; height: 44px; margin-bottom: 2px; }
+.ws-signature-images img.ws-sig-img { max-height: 36px; max-width: 140px; vertical-align: bottom; }
+.ws-signature-images img.ws-stamp-img { max-height: 44px; max-width: 70px; vertical-align: bottom; margin-left: 6px; opacity: 0.9; }
 
 /* ============ Payment meta box (OR only) ============ */
 .ws-payment-meta {
-    margin: 8px 0;
-    padding: 6px 10px;
+    margin: 4px 0;
+    padding: 3px 8px;
     background: #f4f7fa;
     border: 1px solid {{ $accentDark }};
-    font-size: 9pt;
+    font-size: 8.5pt;
 }
 .ws-payment-meta strong { color: {{ $accentDark }}; }
 .ws-payment-meta-row { display: table; width: 100%; }
-.ws-payment-meta-cell { display: table-cell; padding-right: 18px; }
+.ws-payment-meta-cell { display: table-cell; padding-right: 14px; line-height: 1.35; }
 
 /* ============ Footer doc note ============ */
 .ws-footer-doc {
-    margin-top: 10px;
-    padding-top: 4px;
+    margin-top: 4px;
+    padding-top: 2px;
     border-top: 1px solid #e0e0e0;
-    font-size: 7.5pt;
+    font-size: 7pt;
     text-align: center;
     color: #888;
 }
-.ws-page-number { text-align: right; font-size: 7.5pt; color: #888; margin-top: 4px; }
+.ws-page-number { text-align: right; font-size: 7pt; color: #888; margin-top: 2px; }
 .page-break { page-break-before: always; }
 
 /* ============ Compact header for continuation pages ============ */
 .ws-header-compact {
     background: {{ $accentDark }};
     color: #ffffff;
-    padding: 5px 12px;
-    margin: -2px -2px 8px -2px;
+    padding: 4px 12px;
+    margin: -2px -2px 4px -2px;
     display: table;
     width: 100%;
     font-family: 'DejaVu Sans', sans-serif;
-    font-size: 9pt;
+    font-size: 8.5pt;
 }
 .ws-header-compact-name { display: table-cell; width: 32%; font-weight: bold; }
 .ws-header-compact-center { display: table-cell; width: 36%; text-align: center; font-weight: bold; letter-spacing: 0.6px; }

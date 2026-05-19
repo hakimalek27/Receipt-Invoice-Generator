@@ -217,15 +217,15 @@ class PdfRenderService
         // so the "Continued on next page" footer/totals always land on the right logical page.
         $isWehdah = ($company?->code ?? null) === 'WS';
         if ($document->document_type === 'delivery_order') {
-            $perPage = $isWehdah ? 18 : 20;
+            $perPage = $isWehdah ? 24 : 20;
         } elseif ($document->document_type === 'official_receipt') {
-            $perPage = $isWehdah ? 18 : 15;
+            $perPage = $isWehdah ? 24 : 15;
         } else {
-            $perPage = $isWehdah ? 12 : 15;
+            $perPage = $isWehdah ? 18 : 15;
         }
         // Section header rows take vertical space too; trim per-page when any are present.
         if ($document->items->whereNotNull('section_header')->isNotEmpty()) {
-            $perPage = max(8, $perPage - 1);
+            $perPage = max(10, $perPage - 1);
         }
         $pages = $document->items->chunk($perPage);
         if ($pages->isEmpty()) {
