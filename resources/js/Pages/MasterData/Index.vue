@@ -121,11 +121,112 @@ const tabs = [
     ['company', 'Company'],
     ['branding', 'Branding'],
     ['bank-accounts', 'Bank Accounts'],
+    ['boilerplate', 'PDF Boilerplate'],
     ['customers', 'Customers'],
     ['products', 'Products'],
     ['templates', 'Templates'],
     ['numbering', 'Numbering'],
 ];
+
+const BOILERPLATE_DEFAULTS = {
+    invoice: {
+        intro: '',
+        footer_terms: 'Goods sold are not returnable and payment made is not refundable.\nAll cheques should be crossed and made payable to {company_name}.',
+        signature_left_intro: 'Yours faithfully,',
+        signature_left_label: 'Authorised Signature',
+        signature_right_intro: 'Goods received in right and good condition',
+        signature_right_label: 'Company Sign & Chop',
+    },
+    quotation: {
+        intro: 'Thank you for your inquiry. We are pleased to submit our quote as follows:',
+        footer_terms: 'We hope that our quotation is favourable to you and we look forward to receiving your valued order.\nIf you require further clarification, please do not hesitate to contact us.',
+        signature_left_intro: 'Yours faithfully,',
+        signature_left_label: 'Authorised Signature',
+        signature_right_intro: 'We confirm the order by accepting the terms',
+        signature_right_label: 'Signature & Company Stamp',
+    },
+    delivery_order: {
+        intro: '',
+        footer_terms: '',
+        signature_left_intro: 'Delivered by,',
+        signature_left_label: 'Authorised Signature',
+        signature_right_intro: 'Goods received in right and good condition',
+        signature_right_label: 'Customer Sign & Chop',
+    },
+    official_receipt: {
+        intro: 'Received with thanks the sum of:',
+        footer_terms: '',
+        signature_left_intro: '',
+        signature_left_label: '',
+        signature_right_intro: 'For {company_name}',
+        signature_right_label: 'Authorised Signature',
+    },
+};
+
+function blankBoilerplate() {
+    return JSON.parse(JSON.stringify(BOILERPLATE_DEFAULTS));
+}
+
+function mergeBoilerplate(saved) {
+    const base = blankBoilerplate();
+    if (! saved || typeof saved !== 'object') return base;
+    for (const docType of Object.keys(base)) {
+        if (saved[docType] && typeof saved[docType] === 'object') {
+            for (const key of Object.keys(base[docType])) {
+                if (saved[docType][key] !== undefined && saved[docType][key] !== null) {
+                    base[docType][key] = saved[docType][key];
+                }
+            }
+        }
+    }
+    return base;
+}
+
+const boilerplateForm = reactive(mergeBoilerplate(props.company?.pdf_boilerplate));
+const boilerplateDocType = ref('invoice');
+const boilerplateMsg = ref('');
+const boilerplateBusy = ref(false);
+
+const boilerplateDocTypes = [
+    ['invoice', 'Invoice'],
+    ['quotation', 'Quotation'],
+    ['delivery_order', 'Delivery Order'],
+    ['official_receipt', 'Official Receipt'],
+];
+
+const boilerplateFields = [
+    ['intro', 'Intro text (above items table)', 'textarea'],
+    ['footer_terms', 'Footer terms / disclaimer', 'textarea'],
+    ['signature_left_intro', 'Signature - Left column intro', 'input'],
+    ['signature_left_label', 'Signature - Left column label', 'input'],
+    ['signature_right_intro', 'Signature - Right column intro', 'input'],
+    ['signature_right_label', 'Signature - Right column label', 'input'],
+];
+
+function resetBoilerplateDocType(docType) {
+    Object.assign(boilerplateForm[docType], BOILERPLATE_DEFAULTS[docType]);
+}
+
+async function saveBoilerplate() {
+    if (! props.company?.id) return;
+    boilerplateBusy.value = true;
+    boilerplateMsg.value = '';
+    try {
+        const sanitized = JSON.parse(JSON.stringify(boilerplateForm));
+        const updated = await apiFetch(`/api/companies/${props.company.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ pdf_boilerplate: sanitized }),
+        });
+        if (updated?.pdf_boilerplate) {
+            Object.assign(boilerplateForm, mergeBoilerplate(updated.pdf_boilerplate));
+        }
+        boilerplateMsg.value = 'PDF boilerplate saved.';
+    } catch (e) {
+        boilerplateMsg.value = e.message || 'Save failed.';
+    } finally {
+        boilerplateBusy.value = false;
+    }
+}
 
 const numberingPreview = computed(() => {
     const year = new Date().getFullYear().toString();
@@ -541,6 +642,62 @@ function reset(target, values) {
                                     Delete
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section v-if="activeTab === 'boilerplate'" class="mt-6 space-y-4">
+                    <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <h3 class="text-base font-semibold text-gray-900">PDF Boilerplate</h3>
+                                <p class="text-sm text-gray-500">
+                                    Customise the intro, footer terms, and signature labels that appear on every generated PDF.
+                                    Leave a field blank to fall back to the system default. Token <code class="rounded bg-gray-100 px-1">{company_name}</code> is replaced at render time.
+                                </p>
+                            </div>
+                            <div v-if="boilerplateMsg" class="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{{ boilerplateMsg }}</div>
+                        </div>
+
+                        <div class="mt-4 flex flex-wrap gap-2 border-b border-gray-200 pb-3">
+                            <button v-for="[key, label] in boilerplateDocTypes" :key="key"
+                                    @click="boilerplateDocType = key"
+                                    class="rounded-md border px-3 py-1.5 text-sm"
+                                    :class="boilerplateDocType === key
+                                        ? 'border-indigo-300 bg-indigo-50 font-semibold text-indigo-900'
+                                        : 'border-gray-300 bg-white text-gray-700'">
+                                {{ label }}
+                            </button>
+                        </div>
+
+                        <div class="mt-5 space-y-4">
+                            <div v-for="[fieldKey, fieldLabel, fieldType] in boilerplateFields" :key="`${boilerplateDocType}-${fieldKey}`">
+                                <label class="block text-sm font-medium text-gray-700">
+                                    {{ fieldLabel }}
+                                    <span v-if="!boilerplateForm[boilerplateDocType][fieldKey] && BOILERPLATE_DEFAULTS[boilerplateDocType][fieldKey]" class="ml-1 text-xs font-normal text-gray-400">(currently default)</span>
+                                </label>
+                                <textarea v-if="fieldType === 'textarea'"
+                                          v-model="boilerplateForm[boilerplateDocType][fieldKey]"
+                                          rows="2"
+                                          class="mt-1 w-full rounded-md border-gray-300 text-sm font-mono"
+                                          :placeholder="BOILERPLATE_DEFAULTS[boilerplateDocType][fieldKey] || '(no default)'"></textarea>
+                                <input v-else
+                                       v-model="boilerplateForm[boilerplateDocType][fieldKey]"
+                                       class="mt-1 w-full rounded-md border-gray-300 text-sm"
+                                       :placeholder="BOILERPLATE_DEFAULTS[boilerplateDocType][fieldKey] || '(no default)'">
+                            </div>
+                        </div>
+
+                        <div class="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-4">
+                            <button @click="resetBoilerplateDocType(boilerplateDocType)"
+                                    class="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700">
+                                Reset this doc type to defaults
+                            </button>
+                            <button @click="saveBoilerplate"
+                                    :disabled="boilerplateBusy"
+                                    class="rounded-md bg-indigo-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                                {{ boilerplateBusy ? 'Saving…' : 'Save All PDF Boilerplate' }}
+                            </button>
                         </div>
                     </div>
                 </section>

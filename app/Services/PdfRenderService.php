@@ -16,6 +16,7 @@ class PdfRenderService
 {
     public function __construct(
         private readonly AmountInWordsService $amountInWords,
+        private readonly PdfBoilerplateService $boilerplate,
     ) {}
 
     /**
@@ -233,6 +234,14 @@ class PdfRenderService
         }
         $totalPages = $pages->count();
 
+        $rawBoilerplate = data_get($company, 'pdf_boilerplate');
+        $companyBoilerplate = null;
+        if (is_array($rawBoilerplate)) {
+            $companyBoilerplate = $rawBoilerplate;
+        } elseif (is_object($rawBoilerplate)) {
+            $companyBoilerplate = json_decode(json_encode($rawBoilerplate), true);
+        }
+
         return [
             'document' => $document,
             'company' => $company,
@@ -247,6 +256,11 @@ class PdfRenderService
             'isLastPage' => false,
             'pageNumber' => 1,
             'brand' => $this->brandPalette($company),
+            'boilerplate' => $this->boilerplate->resolve(
+                $companyBoilerplate,
+                $document->document_type,
+                $company?->name
+            ),
         ];
     }
 

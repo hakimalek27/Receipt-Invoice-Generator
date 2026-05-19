@@ -38,11 +38,13 @@ class Company extends Model
         'brand_primary',
         'brand_secondary',
         'brand_accent',
+        'pdf_boilerplate',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'settings' => 'array',
+        'pdf_boilerplate' => 'array',
     ];
 
     public function getLogoUrlAttribute(): ?string

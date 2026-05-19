@@ -19,7 +19,9 @@
                 @include('pdf.wehdah._meta-block', ['documentTitleEn' => 'OFFICIAL RECEIPT', 'showValidity' => false])
             </div>
         </div>
-        <p class="ws-intro">Received with thanks the sum of:</p>
+        @if(!empty($boilerplate['intro']))
+            <p class="ws-intro">{{ $boilerplate['intro'] }}</p>
+        @endif
     @else
         @include('pdf.wehdah._header', ['variant' => 'compact', 'documentTitle' => 'OFFICIAL RECEIPT'])
     @endif
@@ -91,14 +93,18 @@
 
         @include('pdf.wehdah._bank')
 
+        @if(!empty($boilerplate['footer_terms']))
+            <div class="ws-terms">{!! nl2br(e($boilerplate['footer_terms'])) !!}</div>
+        @endif
+
         @if($document->notes)
             <div class="ws-terms"><strong>Notes:</strong> {!! nl2br(e($document->notes)) !!}</div>
         @endif
 
         @include('pdf.wehdah._signature', [
             'singleColumn' => true,
-            'rightIntro' => 'For ' . ($company->name ?? ''),
-            'rightLabel' => 'Authorised Signature',
+            'rightIntro' => $boilerplate['signature_right_intro'] ?? ('For ' . ($company->name ?? '')),
+            'rightLabel' => $boilerplate['signature_right_label'] ?? 'Authorised Signature',
         ])
     @endif
 

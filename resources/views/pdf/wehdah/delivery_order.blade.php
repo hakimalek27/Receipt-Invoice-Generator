@@ -50,15 +50,18 @@
         @if($document->notes)
             <div class="ws-terms"><strong>Notes:</strong> {!! nl2br(e($document->notes)) !!}</div>
         @endif
+        @if(!empty($boilerplate['footer_terms']))
+            <div class="ws-terms">{!! nl2br(e($boilerplate['footer_terms'])) !!}</div>
+        @endif
         @if($document->terms)
             <div class="ws-terms"><strong>Terms:</strong> {!! nl2br(e($document->terms)) !!}</div>
         @endif
 
         @include('pdf.wehdah._signature', [
-            'leftIntro' => 'Delivered by,',
-            'leftLabel' => 'Authorised Signature',
-            'rightIntro' => 'Goods received in right and good condition',
-            'rightLabel' => 'Customer Sign & Chop',
+            'leftIntro' => $boilerplate['signature_left_intro'] ?? 'Delivered by,',
+            'leftLabel' => $boilerplate['signature_left_label'] ?? 'Authorised Signature',
+            'rightIntro' => $boilerplate['signature_right_intro'] ?? 'Goods received in right and good condition',
+            'rightLabel' => $boilerplate['signature_right_label'] ?? 'Customer Sign & Chop',
         ])
     @endif
 

@@ -80,20 +80,19 @@
 
         @include('pdf.wehdah._bank')
 
-        <div class="ws-terms">
-            Goods sold are not returnable and payment made is not refundable.<br>
-            All cheques should be crossed and made payable to <strong>{{ strtoupper($company->name ?? '') }}</strong>.
-        </div>
+        @if(!empty($boilerplate['footer_terms']))
+            <div class="ws-terms">{!! nl2br(e($boilerplate['footer_terms'])) !!}</div>
+        @endif
 
         @if($document->terms)
             <div class="ws-terms"><strong>Terms:</strong> {!! nl2br(e($document->terms)) !!}</div>
         @endif
 
         @include('pdf.wehdah._signature', [
-            'leftIntro' => 'Yours faithfully,',
-            'leftLabel' => 'Authorised Signature',
-            'rightIntro' => 'Goods received in right and good condition',
-            'rightLabel' => 'Company Sign & Chop',
+            'leftIntro' => $boilerplate['signature_left_intro'] ?? 'Yours faithfully,',
+            'leftLabel' => $boilerplate['signature_left_label'] ?? 'Authorised Signature',
+            'rightIntro' => $boilerplate['signature_right_intro'] ?? 'Goods received in right and good condition',
+            'rightLabel' => $boilerplate['signature_right_label'] ?? 'Company Sign & Chop',
         ])
     @endif
 

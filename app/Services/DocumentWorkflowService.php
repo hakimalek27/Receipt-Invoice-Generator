@@ -434,6 +434,13 @@ class DocumentWorkflowService
             'sst_registration_number' => $company->sst_registration_number,
             'msic_code' => $company->msic_code,
             'business_activity_description' => $company->business_activity_description,
+            'logo_path' => $company->logo_path,
+            'stamp_path' => $company->stamp_path,
+            'signature_path' => $company->signature_path,
+            'brand_primary' => $company->brand_primary,
+            'brand_secondary' => $company->brand_secondary,
+            'brand_accent' => $company->brand_accent,
+            'pdf_boilerplate' => $company->pdf_boilerplate,
         ];
     }
 

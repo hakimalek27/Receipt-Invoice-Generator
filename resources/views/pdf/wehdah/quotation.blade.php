@@ -19,7 +19,9 @@
                 @include('pdf.wehdah._meta-block', ['documentTitleEn' => 'QUOTATION', 'showValidity' => true])
             </div>
         </div>
-        <p class="ws-intro">Thank you for your inquiry. We are pleased to submit our quote as follows:</p>
+        @if(!empty($boilerplate['intro']))
+            <p class="ws-intro">{{ $boilerplate['intro'] }}</p>
+        @endif
     @else
         @include('pdf.wehdah._header', ['variant' => 'compact', 'documentTitle' => 'QUOTATION'])
     @endif
@@ -76,20 +78,19 @@
             </div>
         </div>
 
-        <div class="ws-terms">
-            We hope that our quotation is favourable to you and we look forward to receiving your valued order.
-            If you require further clarification, please do not hesitate to contact us.
-        </div>
+        @if(!empty($boilerplate['footer_terms']))
+            <div class="ws-terms">{!! nl2br(e($boilerplate['footer_terms'])) !!}</div>
+        @endif
 
         @if($document->terms)
             <div class="ws-terms"><strong>Terms:</strong> {!! nl2br(e($document->terms)) !!}</div>
         @endif
 
         @include('pdf.wehdah._signature', [
-            'leftIntro' => 'Yours faithfully,',
-            'leftLabel' => 'Authorised Signature',
-            'rightIntro' => 'We confirm the order by accepting the terms',
-            'rightLabel' => 'Signature & Company Stamp',
+            'leftIntro' => $boilerplate['signature_left_intro'] ?? 'Yours faithfully,',
+            'leftLabel' => $boilerplate['signature_left_label'] ?? 'Authorised Signature',
+            'rightIntro' => $boilerplate['signature_right_intro'] ?? 'We confirm the order by accepting the terms',
+            'rightLabel' => $boilerplate['signature_right_label'] ?? 'Signature & Company Stamp',
         ])
     @endif
 
