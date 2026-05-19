@@ -14,7 +14,13 @@ const props = defineProps({
     documentTypes: Array,
 });
 
-const activeTab = ref('company');
+const initialTab = (() => {
+    const qs = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+    const requested = qs.get('tab');
+    const allowed = ['company', 'branding', 'bank-accounts', 'boilerplate', 'customers', 'products', 'templates', 'numbering'];
+    return allowed.includes(requested) ? requested : 'company';
+})();
+const activeTab = ref(initialTab);
 const busy = ref(false);
 const notice = ref('');
 const error = ref('');

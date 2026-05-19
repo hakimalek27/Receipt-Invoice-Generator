@@ -28,6 +28,7 @@ Route::get('/dashboard', function () {
 
     $payload = [
         'currentCompany' => $currentCompany,
+        'onboarding' => $currentCompany?->onboardingChecklist() ?? ['complete' => true, 'missing' => [], 'first_tab' => null],
         'stats' => [
             'documents' => Document::forCompany($companyId)->count(),
             'drafts' => Document::forCompany($companyId)->draft()->count(),

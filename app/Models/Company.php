@@ -96,4 +96,40 @@ class Company extends Model
     {
         return $query->where('is_active', true);
     }
+
+    /**
+     * Snapshot of profile completeness — drives the dashboard banner that
+     * nudges admins to finish setting up before generating PDFs.
+     *
+     * Returns ['missing' => [...labelled gaps...], 'tab' => deep-link target].
+     */
+    public function onboardingChecklist(): array
+    {
+        $missing = [];
+
+        if (empty($this->phone) || preg_match('/^\+1\d{10}$/', (string) $this->phone)) {
+            $missing[] = ['label' => 'Phone number', 'tab' => 'company'];
+        }
+        if (empty($this->email) || preg_match('/(gulgowski|zulauf|koss|kuhic)/i', (string) $this->email)) {
+            $missing[] = ['label' => 'Company email', 'tab' => 'company'];
+        }
+        if (empty($this->address_line_2)) {
+            $missing[] = ['label' => 'Full address (line 2)', 'tab' => 'company'];
+        }
+        if (empty($this->logo_path)) {
+            $missing[] = ['label' => 'Company logo', 'tab' => 'branding'];
+        }
+        if (empty($this->stamp_path) || empty($this->signature_path)) {
+            $missing[] = ['label' => 'Stamp + signature image', 'tab' => 'branding'];
+        }
+        if ($this->bankAccounts()->count() === 0) {
+            $missing[] = ['label' => 'At least one bank account', 'tab' => 'bank-accounts'];
+        }
+
+        return [
+            'complete' => count($missing) === 0,
+            'missing' => $missing,
+            'first_tab' => $missing[0]['tab'] ?? null,
+        ];
+    }
 }
