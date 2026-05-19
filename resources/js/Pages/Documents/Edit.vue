@@ -209,13 +209,36 @@ async function saveDraft() {
     }
 }
 
+const previewModal = ref({ open: false, paper: 'a4', url: '' });
+
 async function previewPdf(paper = 'a4') {
     if (!form.id) {
         await saveDraft();
     }
     if (!form.id) return;
     lastPreviewHash.value = form.draft_hash;
-    window.open(`/api/documents/${form.id}/pdf?paper=${paper}`, '_blank');
+    // Cache-buster ensures the iframe re-fetches after edits within the same session.
+    const cacheBuster = Date.now();
+    previewModal.value = {
+        open: true,
+        paper,
+        url: `/api/documents/${form.id}/pdf?paper=${paper}&_=${cacheBuster}`,
+    };
+}
+
+function closePreview() {
+    previewModal.value = { open: false, paper: 'a4', url: '' };
+}
+
+function downloadPdf(paper = 'a4') {
+    if (!form.id) return;
+    // Anchor with download attr triggers save-as without leaving the page.
+    const link = document.createElement('a');
+    link.href = `/api/documents/${form.id}/pdf?paper=${paper}&download=1`;
+    link.rel = 'noopener';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 
 const UPLOAD_MAX_BYTES = 10 * 1024 * 1024; // Aligned with PHP-FPM + nginx (10 MB)
@@ -688,8 +711,14 @@ async function convertDocument() {
                     <div v-if="form.id" class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
                         <h3 class="text-sm font-semibold text-gray-900">Document Actions</h3>
                         <div class="mt-4 grid gap-2">
-                            <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" @click="previewPdf('a4')">Download / Preview A4</button>
-                            <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" @click="previewPdf('60mm')">Download 60mm</button>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" @click="previewPdf('a4')">Preview A4</button>
+                                <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" @click="downloadPdf('a4')">Download A4</button>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" @click="previewPdf('60mm')">Preview 60mm</button>
+                                <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" @click="downloadPdf('60mm')">Download 60mm</button>
+                            </div>
                         </div>
                         <div v-if="form.status === 'issued'" class="mt-5 space-y-3">
                             <div v-if="availableConvertTargets.length > 0" class="space-y-2">
@@ -739,6 +768,55 @@ async function convertDocument() {
                 <div class="mt-6 flex justify-end gap-2">
                     <button class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700" @click="issueOpen = false">Cancel</button>
                     <button class="rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="busy || !previewIsFresh" @click="issueDocument">Issue Document</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- PDF Preview Modal: inline browser-native renderer, sized to A4 or 60mm thermal. -->
+        <div
+            v-if="previewModal.open"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2 sm:p-4"
+            @click.self="closePreview"
+        >
+            <div
+                class="flex max-h-[95vh] flex-col rounded-lg bg-white shadow-2xl"
+                :class="previewModal.paper === '60mm' ? 'w-[320px]' : 'w-full max-w-[860px]'"
+            >
+                <div class="flex items-center justify-between border-b border-gray-200 px-4 py-2">
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-900">
+                            PDF Preview
+                            <span class="ml-1 rounded bg-gray-100 px-2 py-0.5 text-xs font-normal text-gray-600">
+                                {{ previewModal.paper === '60mm' ? 'Thermal 60mm' : 'A4 · 210×297mm' }}
+                            </span>
+                        </h3>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button
+                            type="button"
+                            class="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800"
+                            @click="downloadPdf(previewModal.paper)"
+                        >
+                            Download
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                            @click="closePreview"
+                        >
+                            Close
+                        </button>
+                    </div>
+                </div>
+                <div
+                    class="flex-1 overflow-hidden rounded-b-lg bg-gray-100"
+                    :style="previewModal.paper === '60mm' ? { height: '70vh' } : { height: '85vh' }"
+                >
+                    <iframe
+                        :src="previewModal.url"
+                        class="h-full w-full border-0"
+                        title="PDF preview"
+                    />
                 </div>
             </div>
         </div>

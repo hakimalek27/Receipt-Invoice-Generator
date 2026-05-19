@@ -7,6 +7,7 @@ defineProps({
     stats: Object,
     recentDocuments: Array,
     allCompanyStats: { type: Array, default: () => [] },
+    onboarding: { type: Object, default: () => ({ complete: true, missing: [], first_tab: null }) },
 });
 
 function switchToCompany(companyId) {
@@ -31,6 +32,29 @@ function switchToCompany(companyId) {
 
         <div class="py-8">
             <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+                <div v-if="!onboarding.complete" class="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 shadow-sm">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xl">⚠</span>
+                                <h3 class="text-sm font-semibold text-amber-900">Profil syarikat anda belum lengkap</h3>
+                            </div>
+                            <p class="mt-1 text-xs text-amber-800">
+                                PDF anda akan kelihatan tidak professional sehingga semua field disempurnakan.
+                            </p>
+                            <ul class="mt-2 grid grid-cols-1 gap-1 text-xs text-amber-900 sm:grid-cols-2">
+                                <li v-for="(item, idx) in onboarding.missing" :key="idx" class="flex items-center gap-1">
+                                    <span class="text-amber-700">•</span> {{ item.label }}
+                                </li>
+                            </ul>
+                        </div>
+                        <Link :href="route('master-data.index') + (onboarding.first_tab ? `?tab=${onboarding.first_tab}` : '')"
+                              class="shrink-0 rounded-md bg-amber-700 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-800">
+                            Lengkapkan sekarang →
+                        </Link>
+                    </div>
+                </div>
+
                 <div class="mb-6 grid gap-3 md:grid-cols-4">
                     <Link
                         :href="route('documents.create')"
