@@ -36,10 +36,23 @@ class PdfDownloadController extends Controller
 
         $downloadName = ($document->official_number ?? 'document-'.$document->id).'.pdf';
 
-        return Storage::disk('local')->download(
+        // Default: inline preview in browser. ?download=1 forces a save-as.
+        if ($request->boolean('download')) {
+            return Storage::disk('local')->download(
+                $render->file_path,
+                $downloadName,
+                ['Content-Type' => 'application/pdf']
+            );
+        }
+
+        return Storage::disk('local')->response(
             $render->file_path,
             $downloadName,
-            ['Content-Type' => 'application/pdf']
+            [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="'.$downloadName.'"',
+                'X-Frame-Options' => 'SAMEORIGIN',
+            ]
         );
     }
 }
