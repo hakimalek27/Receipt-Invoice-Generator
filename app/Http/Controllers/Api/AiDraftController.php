@@ -20,7 +20,7 @@ class AiDraftController extends Controller
         ]);
 
         return response()->json(
-            $this->parser->parseIntent($data['message'], $request->user()->company_id)
+            $this->parser->parseIntent($data['message'], \App\Services\ActiveCompanyResolver::resolve($request->user(), $request))
         );
     }
 }

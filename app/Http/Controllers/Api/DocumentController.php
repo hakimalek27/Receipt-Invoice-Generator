@@ -34,7 +34,7 @@ class DocumentController extends Controller
         $document = Document::findOrFail($id);
 
         // Verify company scope
-        if ($document->company_id !== $request->user()->company_id
+        if ($document->company_id !== \App\Services\ActiveCompanyResolver::resolve($request->user(), $request)
             && ! $request->user()->isSuperAdmin()) {
             return response()->json(['error' => 'Company scope violation'], 403);
         }
@@ -150,7 +150,7 @@ class DocumentController extends Controller
             'items.*.tax_exemption_reason' => 'nullable|string',
         ]);
 
-        $data['company_id'] = $request->user()->company_id;
+        $data['company_id'] = \App\Services\ActiveCompanyResolver::resolve($request->user(), $request);
         $data['currency'] = strtoupper($data['currency'] ?? 'MYR');
         if ($data['currency'] !== 'MYR' && empty($data['fx_rate'])) {
             return response()->json(['error' => 'Non-MYR documents require an FX rate snapshot'], 422);
@@ -168,7 +168,7 @@ class DocumentController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $document = Document::with('items')->findOrFail($id);
-        if ($document->company_id !== $request->user()->company_id
+        if ($document->company_id !== \App\Services\ActiveCompanyResolver::resolve($request->user(), $request)
             && ! $request->user()->isSuperAdmin()) {
             return response()->json(['error' => 'Company scope violation'], 403);
         }
@@ -250,7 +250,7 @@ class DocumentController extends Controller
     public function void(Request $request, int $id): JsonResponse
     {
         $document = Document::findOrFail($id);
-        if ($document->company_id !== $request->user()->company_id
+        if ($document->company_id !== \App\Services\ActiveCompanyResolver::resolve($request->user(), $request)
             && ! $request->user()->isSuperAdmin()) {
             return response()->json(['error' => 'Company scope violation'], 403);
         }
@@ -267,7 +267,7 @@ class DocumentController extends Controller
     public function convert(Request $request, int $id): JsonResponse
     {
         $document = Document::findOrFail($id);
-        if ($document->company_id !== $request->user()->company_id
+        if ($document->company_id !== \App\Services\ActiveCompanyResolver::resolve($request->user(), $request)
             && ! $request->user()->isSuperAdmin()) {
             return response()->json(['error' => 'Company scope violation'], 403);
         }
@@ -332,7 +332,7 @@ class DocumentController extends Controller
         $document = Document::with('items', 'customer', 'attachments', 'pdfRenders', 'paymentAllocations')
             ->findOrFail($id);
 
-        if ($document->company_id !== $request->user()->company_id
+        if ($document->company_id !== \App\Services\ActiveCompanyResolver::resolve($request->user(), $request)
             && ! $request->user()->isSuperAdmin()) {
             return response()->json(['error' => 'Company scope violation'], 403);
         }

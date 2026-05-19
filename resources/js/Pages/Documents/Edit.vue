@@ -216,11 +216,21 @@ async function previewPdf(paper = 'a4') {
     window.open(`/api/documents/${form.id}/pdf?paper=${paper}`, '_blank');
 }
 
+const UPLOAD_MAX_BYTES = 2 * 1024 * 1024; // PHP upload_max_filesize default (2 MB)
+
 async function uploadArtwork() {
     if (!form.id) {
         await saveDraft();
     }
     if (!form.id || artworkFiles.value.length === 0) return;
+
+    const tooBig = artworkFiles.value.filter((f) => f.size > UPLOAD_MAX_BYTES);
+    if (tooBig.length > 0) {
+        const names = tooBig.map((f) => `${f.name} (${(f.size / 1024 / 1024).toFixed(2)} MB)`).join(', ');
+        error.value = `These files exceed the 2 MB server upload limit: ${names}. Please compress or split the files.`;
+        return;
+    }
+
     busy.value = true;
     error.value = '';
     const captionBase = artworkCaption.value.trim();
@@ -252,6 +262,43 @@ async function uploadArtwork() {
         } else {
             message.value = `${uploaded} uploaded, ${failed} failed.`;
         }
+    } finally {
+        busy.value = false;
+    }
+}
+
+async function removeAttachment(attachmentId) {
+    if (!form.id || !attachmentId) return;
+    if (!confirm('Delete this artwork attachment?')) return;
+    busy.value = true;
+    error.value = '';
+    try {
+        await apiFetch(`/api/documents/${form.id}/attachments/${attachmentId}`, { method: 'DELETE' });
+        form.attachments = form.attachments.filter((a) => a.id !== attachmentId);
+        message.value = 'Artwork removed.';
+    } catch (e) {
+        error.value = e.message;
+    } finally {
+        busy.value = false;
+    }
+}
+
+async function moveAttachment(index, direction) {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= form.attachments.length) return;
+    const reordered = [...form.attachments];
+    [reordered[index], reordered[newIndex]] = [reordered[newIndex], reordered[index]];
+    const payload = reordered.map((a, i) => ({ id: a.id, sort_order: i + 1 }));
+    busy.value = true;
+    error.value = '';
+    try {
+        await apiFetch(`/api/documents/${form.id}/attachments/reorder`, {
+            method: 'PATCH',
+            body: JSON.stringify({ attachments: payload }),
+        });
+        form.attachments = reordered.map((a, i) => ({ ...a, sort_order: i + 1 }));
+    } catch (e) {
+        error.value = e.message;
     } finally {
         busy.value = false;
     }
@@ -515,17 +562,30 @@ async function convertDocument() {
                     <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
                         <div class="flex items-center justify-between">
                             <h3 class="text-sm font-semibold text-gray-900">Artwork Attachments</h3>
-                            <span class="text-xs text-gray-500">Private storage · JPG/PNG/WEBP/PDF only</span>
+                            <span class="text-xs text-gray-500">JPG/PNG/WEBP/PDF · max 2 MB per file</span>
                         </div>
                         <div class="mt-4 grid gap-3 md:grid-cols-[1fr_220px_auto]">
                             <input type="file" multiple accept=".jpg,.jpeg,.png,.webp,.pdf" :disabled="!isDraft" class="rounded-md border border-gray-300 px-3 py-2 text-sm" @change="artworkFiles = Array.from($event.target.files)">
                             <input v-model="artworkCaption" :disabled="!isDraft" class="rounded-md border-gray-300 text-sm" placeholder="Caption (prefix; #N appended for multi-upload)">
                             <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 disabled:opacity-50" :disabled="busy || !isDraft || artworkFiles.length === 0" @click="uploadArtwork">Upload {{ artworkFiles.length > 1 ? `(${artworkFiles.length})` : '' }}</button>
                         </div>
+                        <div v-if="artworkFiles.length > 0" class="mt-2 text-xs text-gray-600">
+                            Selected: {{ artworkFiles.map((f) => `${f.name} (${(f.size / 1024 / 1024).toFixed(2)} MB)`).join(', ') }}
+                        </div>
                         <div class="mt-3 divide-y divide-gray-100 text-sm">
-                            <div v-for="attachment in form.attachments" :key="attachment.id" class="flex items-center justify-between py-2">
-                                <span>{{ attachment.caption || attachment.original_name }}</span>
-                                <span class="text-xs text-gray-500">{{ attachment.mime_type }}</span>
+                            <div v-for="(attachment, index) in form.attachments" :key="attachment.id" class="flex items-center justify-between gap-3 py-2">
+                                <div class="flex flex-1 items-center gap-2 truncate">
+                                    <span class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-600">{{ index + 1 }}</span>
+                                    <span class="truncate">{{ attachment.caption || attachment.original_name }}</span>
+                                    <span class="text-xs text-gray-400">·</span>
+                                    <span class="text-xs text-gray-500">{{ attachment.mime_type }}</span>
+                                    <span v-if="attachment.size_bytes" class="text-xs text-gray-400">· {{ (attachment.size_bytes / 1024).toFixed(0) }} KB</span>
+                                </div>
+                                <div class="flex shrink-0 items-center gap-1">
+                                    <button :disabled="!isDraft || busy || index === 0" @click="moveAttachment(index, -1)" class="rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 disabled:opacity-30" title="Move up">↑</button>
+                                    <button :disabled="!isDraft || busy || index === form.attachments.length - 1" @click="moveAttachment(index, 1)" class="rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 disabled:opacity-30" title="Move down">↓</button>
+                                    <button :disabled="!isDraft || busy" @click="removeAttachment(attachment.id)" class="rounded border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 disabled:opacity-30">Remove</button>
+                                </div>
                             </div>
                             <div v-if="form.attachments.length === 0" class="py-4 text-gray-500">No artwork uploaded.</div>
                         </div>

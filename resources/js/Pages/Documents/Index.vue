@@ -22,6 +22,27 @@ function applyFilters() {
         replace: true,
     });
 }
+
+function statusBadgeClass(status) {
+    return {
+        draft: 'bg-amber-100 text-amber-800',
+        issued: 'bg-emerald-100 text-emerald-800',
+        converted: 'bg-indigo-100 text-indigo-800',
+        void: 'bg-red-100 text-red-800',
+        cancelled: 'bg-gray-200 text-gray-700',
+    }[status] || 'bg-gray-100 text-gray-700';
+}
+
+function chainTooltip(document) {
+    const parts = [];
+    if (document.converted_from) {
+        parts.push(`From ${document.converted_from.document_type} ${document.converted_from.official_number || '#' + document.converted_from.id}`);
+    }
+    if (document.converted_to?.length) {
+        parts.push(`Converted to: ${document.converted_to.map((c) => c.document_type + ' ' + (c.official_number || '#' + c.id)).join(', ')}`);
+    }
+    return parts.join(' · ');
+}
 </script>
 
 <template>
@@ -53,8 +74,9 @@ function applyFilters() {
                             <option value="">All statuses</option>
                             <option value="draft">draft</option>
                             <option value="issued">issued</option>
-                            <option value="void">void</option>
                             <option value="converted">converted</option>
+                            <option value="void">void</option>
+                            <option value="cancelled">cancelled</option>
                         </select>
                         <button class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700" @click="applyFilters">
                             Filter
@@ -77,21 +99,21 @@ function applyFilters() {
                         </thead>
                         <tbody class="divide-y divide-gray-100">
                             <tr v-for="document in documents.data" :key="document.id" class="hover:bg-gray-50">
-                                <td class="px-4 py-3 font-medium">{{ document.document_type }}</td>
-                                <td class="px-4 py-3">{{ document.official_number || `Draft #${document.id}` }}</td>
+                                <td class="px-4 py-3 font-medium">
+                                    {{ document.document_type }}
+                                    <span v-if="document.converted_from || document.converted_to?.length"
+                                          class="ml-1 inline-block rounded bg-indigo-50 px-1 text-[10px] font-medium text-indigo-700"
+                                          :title="chainTooltip(document)">⇌</span>
+                                </td>
+                                <td class="px-4 py-3 font-mono text-xs">{{ document.official_number || `Draft #${document.id}` }}</td>
                                 <td class="px-4 py-3">{{ document.customer?.name || '-' }}</td>
                                 <td class="px-4 py-3">
-                                    <span class="rounded-full px-2 py-1 text-xs font-medium" :class="{
-                                        'bg-amber-100 text-amber-800': document.status === 'draft',
-                                        'bg-emerald-100 text-emerald-800': document.status === 'issued',
-                                        'bg-red-100 text-red-800': document.status === 'void',
-                                        'bg-gray-100 text-gray-700': !['draft','issued','void'].includes(document.status),
-                                    }">{{ document.status }}</span>
+                                    <span class="rounded-full px-2 py-0.5 text-xs font-medium" :class="statusBadgeClass(document.status)">{{ document.status }}</span>
                                 </td>
-                                <td class="px-4 py-3">{{ document.document_date?.slice(0, 10) || '-' }}</td>
-                                <td class="px-4 py-3 text-right">{{ money(document.grand_total, document.currency) }}</td>
+                                <td class="px-4 py-3 text-xs">{{ document.document_date?.slice(0, 10) || '-' }}</td>
+                                <td class="px-4 py-3 text-right font-medium">{{ money(document.grand_total, document.currency) }}</td>
                                 <td class="px-4 py-3 text-right">
-                                    <Link :href="route('documents.edit', document.id)" class="font-medium text-gray-900">Open</Link>
+                                    <Link :href="route('documents.edit', document.id)" class="font-medium text-indigo-700 hover:underline">Open</Link>
                                 </td>
                             </tr>
                             <tr v-if="documents.data.length === 0">

@@ -18,7 +18,7 @@ class MasterDataController extends Controller
     {
         $query = Company::query()->orderBy('name');
         if (! $request->user()->isSuperAdmin()) {
-            $query->whereKey($request->user()->company_id);
+            $query->whereKey(\App\Services\ActiveCompanyResolver::resolve($request->user(), $request));
         }
 
         return response()->json($query->get());
@@ -83,13 +83,13 @@ class MasterDataController extends Controller
 
     public function customers(Request $request): JsonResponse
     {
-        return response()->json(Customer::forCompany($request->user()->company_id)->orderBy('name')->paginate(50));
+        return response()->json(Customer::forCompany(\App\Services\ActiveCompanyResolver::resolve($request->user(), $request))->orderBy('name')->paginate(50));
     }
 
     public function storeCustomer(Request $request): JsonResponse
     {
         $customer = Customer::create($this->customerData($request) + [
-            'company_id' => $request->user()->company_id,
+            'company_id' => \App\Services\ActiveCompanyResolver::resolve($request->user(), $request),
         ]);
 
         return response()->json($customer, 201);
@@ -97,7 +97,7 @@ class MasterDataController extends Controller
 
     public function updateCustomer(Request $request, int $customer): JsonResponse
     {
-        $customer = Customer::forCompany($request->user()->company_id)->findOrFail($customer);
+        $customer = Customer::forCompany(\App\Services\ActiveCompanyResolver::resolve($request->user(), $request))->findOrFail($customer);
         $customer->update($this->customerData($request, false));
 
         return response()->json($customer->fresh());
@@ -105,13 +105,13 @@ class MasterDataController extends Controller
 
     public function products(Request $request): JsonResponse
     {
-        return response()->json(Product::forCompany($request->user()->company_id)->orderBy('name')->paginate(50));
+        return response()->json(Product::forCompany(\App\Services\ActiveCompanyResolver::resolve($request->user(), $request))->orderBy('name')->paginate(50));
     }
 
     public function storeProduct(Request $request): JsonResponse
     {
         $product = Product::create($this->productData($request) + [
-            'company_id' => $request->user()->company_id,
+            'company_id' => \App\Services\ActiveCompanyResolver::resolve($request->user(), $request),
         ]);
 
         return response()->json($product, 201);
@@ -119,7 +119,7 @@ class MasterDataController extends Controller
 
     public function updateProduct(Request $request, int $product): JsonResponse
     {
-        $product = Product::forCompany($request->user()->company_id)->findOrFail($product);
+        $product = Product::forCompany(\App\Services\ActiveCompanyResolver::resolve($request->user(), $request))->findOrFail($product);
         $product->update($this->productData($request, false));
 
         return response()->json($product->fresh());
@@ -127,13 +127,13 @@ class MasterDataController extends Controller
 
     public function templates(Request $request): JsonResponse
     {
-        return response()->json(DocumentTemplate::forCompany($request->user()->company_id)->orderBy('document_type')->get());
+        return response()->json(DocumentTemplate::forCompany(\App\Services\ActiveCompanyResolver::resolve($request->user(), $request))->orderBy('document_type')->get());
     }
 
     public function storeTemplate(Request $request): JsonResponse
     {
         $template = DocumentTemplate::create($this->templateData($request) + [
-            'company_id' => $request->user()->company_id,
+            'company_id' => \App\Services\ActiveCompanyResolver::resolve($request->user(), $request),
         ]);
 
         return response()->json($template, 201);
@@ -141,7 +141,7 @@ class MasterDataController extends Controller
 
     public function updateTemplate(Request $request, int $template): JsonResponse
     {
-        $template = DocumentTemplate::forCompany($request->user()->company_id)->findOrFail($template);
+        $template = DocumentTemplate::forCompany(\App\Services\ActiveCompanyResolver::resolve($request->user(), $request))->findOrFail($template);
         $template->update($this->templateData($request, false));
 
         return response()->json($template->fresh());
@@ -149,13 +149,13 @@ class MasterDataController extends Controller
 
     public function numberingPolicies(Request $request): JsonResponse
     {
-        return response()->json(NumberingPolicy::forCompany($request->user()->company_id)->orderBy('document_type')->get());
+        return response()->json(NumberingPolicy::forCompany(\App\Services\ActiveCompanyResolver::resolve($request->user(), $request))->orderBy('document_type')->get());
     }
 
     public function storeNumberingPolicy(Request $request): JsonResponse
     {
         $policy = NumberingPolicy::create($this->numberingData($request) + [
-            'company_id' => $request->user()->company_id,
+            'company_id' => \App\Services\ActiveCompanyResolver::resolve($request->user(), $request),
         ]);
 
         return response()->json($policy, 201);
@@ -163,7 +163,7 @@ class MasterDataController extends Controller
 
     public function updateNumberingPolicy(Request $request, int $policy): JsonResponse
     {
-        $policy = NumberingPolicy::forCompany($request->user()->company_id)->findOrFail($policy);
+        $policy = NumberingPolicy::forCompany(\App\Services\ActiveCompanyResolver::resolve($request->user(), $request))->findOrFail($policy);
         $policy->update($this->numberingData($request, false));
 
         return response()->json($policy->fresh());
@@ -171,7 +171,7 @@ class MasterDataController extends Controller
 
     private function scopedCompany(Request $request, int $companyId): Company
     {
-        if (! $request->user()->isSuperAdmin() && $request->user()->company_id !== $companyId) {
+        if (! $request->user()->isSuperAdmin() && \App\Services\ActiveCompanyResolver::resolve($request->user(), $request) !== $companyId) {
             abort(403, 'Company scope violation');
         }
 

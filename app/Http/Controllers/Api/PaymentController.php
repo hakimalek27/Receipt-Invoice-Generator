@@ -18,7 +18,7 @@ class PaymentController extends Controller
     {
         return response()->json(
             Payment::with('allocations.document', 'receiptDocument')
-                ->forCompany($request->user()->company_id)
+                ->forCompany(\App\Services\ActiveCompanyResolver::resolve($request->user(), $request))
                 ->latest()
                 ->paginate(50)
         );
@@ -40,7 +40,7 @@ class PaymentController extends Controller
             'allocations.*.amount' => 'required|numeric|min:0.01',
         ]);
 
-        $data['company_id'] = $request->user()->company_id;
+        $data['company_id'] = \App\Services\ActiveCompanyResolver::resolve($request->user(), $request);
         $data['user_id'] = $request->user()->id;
 
         return response()->json($this->workflow->recordPayment($data), 201);
@@ -49,7 +49,7 @@ class PaymentController extends Controller
     public function show(Request $request, int $payment): JsonResponse
     {
         $payment = Payment::with('allocations.document', 'receiptDocument')
-            ->forCompany($request->user()->company_id)
+            ->forCompany(\App\Services\ActiveCompanyResolver::resolve($request->user(), $request))
             ->findOrFail($payment);
 
         return response()->json($payment);
@@ -57,7 +57,7 @@ class PaymentController extends Controller
 
     public function generateReceipt(Request $request, int $payment): JsonResponse
     {
-        $paymentModel = Payment::forCompany($request->user()->company_id)
+        $paymentModel = Payment::forCompany(\App\Services\ActiveCompanyResolver::resolve($request->user(), $request))
             ->findOrFail($payment);
 
         if ($paymentModel->receipt_document_id) {

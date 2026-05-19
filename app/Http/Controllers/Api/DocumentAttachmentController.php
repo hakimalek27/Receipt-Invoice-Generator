@@ -108,7 +108,7 @@ class DocumentAttachmentController extends Controller
     private function scopedDocument(Request $request, int $documentId): Document
     {
         $document = Document::findOrFail($documentId);
-        if ($document->company_id !== $request->user()->company_id && ! $request->user()->isSuperAdmin()) {
+        if ($document->company_id !== \App\Services\ActiveCompanyResolver::resolve($request->user(), $request) && ! $request->user()->isSuperAdmin()) {
             abort(403, 'Company scope violation');
         }
 
