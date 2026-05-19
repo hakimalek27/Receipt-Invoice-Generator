@@ -19,13 +19,13 @@
             @if($attachment['is_image'] && $attachment['data_uri'])
                 <table style="width: 100%; border-collapse: collapse;">
                     <tr>
-                        <td style="border: 1px solid #d0d7de; padding: 8px; text-align: center; vertical-align: middle;">
-                            <img src="{{ $attachment['data_uri'] }}" alt="Artwork {{ $attachmentIndex + 1 }}" style="max-width: 100%; max-height: 880px;">
+                        <td style="border: 1px solid #d0d7de; padding: 6px; text-align: center; vertical-align: middle;">
+                            <img src="{{ $attachment['data_uri'] }}" alt="Artwork {{ $attachmentIndex + 1 }}" style="max-width: 100%; max-height: 720px;">
                         </td>
                     </tr>
                 </table>
                 @if(!empty($attachment['caption']) || !empty($attachment['original_name']))
-                    <div style="font-size: 9pt; color: #555; margin-top: 6px; text-align: center;">{{ $attachment['caption'] ?: $attachment['original_name'] }}</div>
+                    <div style="font-size: 9pt; color: #555; margin-top: 4px; text-align: center;">{{ $attachment['caption'] ?: $attachment['original_name'] }}</div>
                 @endif
             @else
                 <table style="width: 100%; border-collapse: collapse; font-size: 10pt;">
@@ -40,8 +40,8 @@
             @endif
 
             @if($showConfirmation && $loop->last)
-                <div style="margin-top: 30px; font-size: 10pt; text-align: center; font-weight: 600;">All artwork has been confirmed</div>
-                <div style="margin: 30px auto 6px; width: 60%; border-top: 1px solid #1a1a1a;"></div>
+                <div style="margin-top: 16px; font-size: 10pt; text-align: center; font-weight: 600;">All artwork has been confirmed</div>
+                <div style="margin: 18px auto 4px; width: 60%; border-top: 1px solid #1a1a1a;"></div>
                 <div style="text-align: center; font-size: 9pt; font-weight: bold;">Company Sign &amp; Chop</div>
             @endif
         </div>
