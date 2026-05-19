@@ -34,7 +34,7 @@ class DocumentController extends Controller
         $document = Document::findOrFail($id);
 
         // Verify company scope
-        if ($document->company_id !== $request->user()->company_id
+        if ($document->company_id !== \App\Services\ActiveCompanyResolver::resolve($request->user(), $request)
             && ! $request->user()->isSuperAdmin()) {
             return response()->json(['error' => 'Company scope violation'], 403);
         }
@@ -129,14 +129,19 @@ class DocumentController extends Controller
             'fx_rate' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string',
             'terms' => 'nullable|string',
+            'product_line' => 'nullable|string|in:scentury,standard',
+            'include_arabic_salutation' => 'nullable|boolean',
             'show_amount_in_words' => 'nullable|boolean',
             'amount_in_words_locale' => 'nullable|string',
             'amount_in_words_currency' => 'nullable|string|size:3',
             'items' => 'nullable|array',
             'items.*.product_id' => 'nullable|integer',
             'items.*.description' => 'required|string',
+            'items.*.section_header' => 'nullable|string|max:255',
+            'items.*.image_url' => ['nullable', 'string', 'regex:/^data:image\/(png|jpe?g|webp);base64,/'],
             'items.*.quantity' => 'nullable|numeric|min:0',
             'items.*.unit_price' => 'nullable|numeric|min:0',
+            'items.*.cost_unit' => 'nullable|numeric|min:0',
             'items.*.discount' => 'nullable|numeric|min:0',
             'items.*.tax_type' => 'nullable|string',
             'items.*.tax_rate' => 'nullable|numeric|min:0',
@@ -145,7 +150,7 @@ class DocumentController extends Controller
             'items.*.tax_exemption_reason' => 'nullable|string',
         ]);
 
-        $data['company_id'] = $request->user()->company_id;
+        $data['company_id'] = \App\Services\ActiveCompanyResolver::resolve($request->user(), $request);
         $data['currency'] = strtoupper($data['currency'] ?? 'MYR');
         if ($data['currency'] !== 'MYR' && empty($data['fx_rate'])) {
             return response()->json(['error' => 'Non-MYR documents require an FX rate snapshot'], 422);
@@ -163,7 +168,7 @@ class DocumentController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $document = Document::with('items')->findOrFail($id);
-        if ($document->company_id !== $request->user()->company_id
+        if ($document->company_id !== \App\Services\ActiveCompanyResolver::resolve($request->user(), $request)
             && ! $request->user()->isSuperAdmin()) {
             return response()->json(['error' => 'Company scope violation'], 403);
         }
@@ -181,15 +186,20 @@ class DocumentController extends Controller
             'notes' => 'nullable|string',
             'terms' => 'nullable|string',
             'internal_notes' => 'nullable|string',
+            'product_line' => 'nullable|string|in:scentury,standard',
+            'include_arabic_salutation' => 'nullable|boolean',
             'show_amount_in_words' => 'nullable|boolean',
             'amount_in_words_locale' => 'nullable|string',
             'amount_in_words_currency' => 'nullable|string|size:3',
             'items' => 'nullable|array',
             'items.*.product_id' => 'nullable|integer',
             'items.*.description' => 'required_with:items|string',
+            'items.*.section_header' => 'nullable|string|max:255',
+            'items.*.image_url' => ['nullable', 'string', 'regex:/^data:image\/(png|jpe?g|webp);base64,/'],
             'items.*.quantity' => 'nullable|numeric|min:0',
             'items.*.uom' => 'nullable|string|max:20',
             'items.*.unit_price' => 'nullable|numeric|min:0',
+            'items.*.cost_unit' => 'nullable|numeric|min:0',
             'items.*.discount' => 'nullable|numeric|min:0',
             'items.*.tax_type' => 'nullable|string',
             'items.*.tax_rate' => 'nullable|numeric|min:0',
@@ -240,7 +250,7 @@ class DocumentController extends Controller
     public function void(Request $request, int $id): JsonResponse
     {
         $document = Document::findOrFail($id);
-        if ($document->company_id !== $request->user()->company_id
+        if ($document->company_id !== \App\Services\ActiveCompanyResolver::resolve($request->user(), $request)
             && ! $request->user()->isSuperAdmin()) {
             return response()->json(['error' => 'Company scope violation'], 403);
         }
@@ -254,10 +264,63 @@ class DocumentController extends Controller
         }
     }
 
+    public function destroy(Request $request, int $id): JsonResponse
+    {
+        $document = Document::findOrFail($id);
+        $companyId = \App\Services\ActiveCompanyResolver::resolve($request->user(), $request);
+        if ($document->company_id !== $companyId && ! $request->user()->isSuperAdmin()) {
+            return response()->json(['error' => 'Company scope violation'], 403);
+        }
+        if (! $document->isDraft()) {
+            return response()->json(['error' => 'Only draft documents may be deleted; use void for issued documents.'], 422);
+        }
+        $document->delete();
+
+        return response()->json(['deleted' => true]);
+    }
+
+    public function bulkDeleteDrafts(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'ids' => 'required|array|min:1|max:100',
+            'ids.*' => 'integer',
+        ]);
+
+        $companyId = \App\Services\ActiveCompanyResolver::resolve($request->user(), $request);
+        $query = Document::query()
+            ->whereIn('id', $data['ids'])
+            ->where('status', Document::STATUS_DRAFT);
+
+        if (! $request->user()->isSuperAdmin()) {
+            $query->where('company_id', $companyId);
+        }
+
+        $deleted = $query->get();
+        Document::whereIn('id', $deleted->pluck('id'))->delete();
+
+        return response()->json([
+            'deleted_count' => $deleted->count(),
+            'deleted_ids' => $deleted->pluck('id'),
+        ]);
+    }
+
+    public function duplicate(Request $request, int $id): JsonResponse
+    {
+        $source = Document::findOrFail($id);
+        $companyId = \App\Services\ActiveCompanyResolver::resolve($request->user(), $request);
+        if ($source->company_id !== $companyId && ! $request->user()->isSuperAdmin()) {
+            return response()->json(['error' => 'Company scope violation'], 403);
+        }
+
+        $draft = $this->workflow->duplicate($id, $request->user()->id);
+
+        return response()->json($draft->load('items'), 201);
+    }
+
     public function convert(Request $request, int $id): JsonResponse
     {
         $document = Document::findOrFail($id);
-        if ($document->company_id !== $request->user()->company_id
+        if ($document->company_id !== \App\Services\ActiveCompanyResolver::resolve($request->user(), $request)
             && ! $request->user()->isSuperAdmin()) {
             return response()->json(['error' => 'Company scope violation'], 403);
         }
@@ -286,9 +349,9 @@ class DocumentController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $companyId = \App\Services\ActiveCompanyResolver::resolve($request->user(), $request);
         $query = Document::with('items', 'customer')
-            ->forCompany($user->company_id)
+            ->forCompany($companyId)
             ->latest();
 
         if ($type = $request->query('type')) {
@@ -322,7 +385,7 @@ class DocumentController extends Controller
         $document = Document::with('items', 'customer', 'attachments', 'pdfRenders', 'paymentAllocations')
             ->findOrFail($id);
 
-        if ($document->company_id !== $request->user()->company_id
+        if ($document->company_id !== \App\Services\ActiveCompanyResolver::resolve($request->user(), $request)
             && ! $request->user()->isSuperAdmin()) {
             return response()->json(['error' => 'Company scope violation'], 403);
         }
@@ -340,9 +403,12 @@ class DocumentController extends Controller
             'document_id' => $documentId,
             'product_id' => $itemData['product_id'] ?? null,
             'description' => $itemData['description'],
+            'section_header' => $itemData['section_header'] ?? null,
+            'image_url' => $itemData['image_url'] ?? null,
             'quantity' => $quantity,
             'uom' => $itemData['uom'] ?? 'unit',
             'unit_price' => $unitPrice,
+            'cost_unit' => isset($itemData['cost_unit']) ? (float) $itemData['cost_unit'] : null,
             'discount' => $discount,
             'line_total' => round(max(0, ($quantity * $unitPrice) - $discount), 2),
             'tax_type' => $itemData['tax_type'] ?? null,

@@ -17,7 +17,7 @@ class PdfDownloadController extends Controller
     public function show(Request $request, int $document)
     {
         $document = Document::with('pdfRenders')->findOrFail($document);
-        if ($document->company_id !== $request->user()->company_id && ! $request->user()->isSuperAdmin()) {
+        if ($document->company_id !== \App\Services\ActiveCompanyResolver::resolve($request->user(), $request) && ! $request->user()->isSuperAdmin()) {
             abort(403, 'Company scope violation');
         }
 

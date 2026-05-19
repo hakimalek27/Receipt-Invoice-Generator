@@ -92,4 +92,24 @@ class AmountInWordsTest extends TestCase
         $result = $this->service->convert(100.50, 'en_MY', 'USD', 'ONLY');
         $this->assertEquals('ONE HUNDRED USD AND FIFTY CENTS', $result);
     }
+
+    public function test_wehdah_english_round_amount(): void
+    {
+        $this->assertEquals('RM: SEVEN HUNDRED AND FIFTY ONLY', $this->service->convert(750.00, 'en_WEHDAH'));
+    }
+
+    public function test_wehdah_english_three_hundred(): void
+    {
+        $this->assertEquals('RM: THREE HUNDRED ONLY', $this->service->convert(300.00, 'en_WEHDAH'));
+    }
+
+    public function test_wehdah_english_thousands(): void
+    {
+        $this->assertEquals('RM: TWO THOUSAND THREE HUNDRED AND FIFTY ONLY', $this->service->convert(2350.00, 'en_WEHDAH'));
+    }
+
+    public function test_wehdah_english_with_cents(): void
+    {
+        $this->assertEquals('RM: SEVEN HUNDRED AND FIFTY AND TWENTY FIVE CENTS', $this->service->convert(750.25, 'en_WEHDAH'));
+    }
 }

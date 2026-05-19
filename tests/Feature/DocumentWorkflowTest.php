@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Company;
+use App\Models\CompanyBankAccount;
 use App\Models\Customer;
 use App\Models\Document;
 use App\Models\NumberingPolicy;
@@ -353,6 +354,69 @@ class DocumentWorkflowTest extends TestCase
         $data = app(PdfRenderService::class)->renderData($issued->fresh());
         $this->assertEquals($originalName, $data['company']->name);
         $this->assertNotEquals('Changed Name', $data['company']->name);
+    }
+
+    public function test_bank_snapshot_serialises_active_company_accounts(): void
+    {
+        CompanyBankAccount::create([
+            'company_id' => $this->company->id,
+            'bank_name' => 'Hong Leong Islamic',
+            'account_number' => '18701038380',
+            'is_primary' => true,
+            'sort_order' => 1,
+        ]);
+        CompanyBankAccount::create([
+            'company_id' => $this->company->id,
+            'bank_name' => 'Bank Islam',
+            'account_number' => '12113010769313',
+            'sort_order' => 2,
+        ]);
+        CompanyBankAccount::create([
+            'company_id' => $this->company->id,
+            'bank_name' => 'Inactive Bank',
+            'account_number' => '00000000',
+            'sort_order' => 3,
+            'is_active' => false,
+        ]);
+
+        $draft = $this->workflow->createDraft([
+            'company_id' => $this->company->id,
+            'document_type' => 'invoice',
+            'items' => [['description' => 'X', 'quantity' => 1, 'unit_price' => 100]],
+        ]);
+        $issued = $this->workflow->issue($draft->id);
+
+        $snapshot = $issued->fresh()->bank_snapshot_json;
+        $this->assertIsArray($snapshot);
+        $this->assertCount(2, $snapshot);
+        $this->assertEquals('Hong Leong Islamic', $snapshot[0]['bank_name']);
+        $this->assertEquals('18701038380', $snapshot[0]['account_number']);
+        $this->assertTrue($snapshot[0]['is_primary']);
+        $this->assertEquals('Bank Islam', $snapshot[1]['bank_name']);
+    }
+
+    public function test_official_receipt_with_allocation_lists_invoice_number(): void
+    {
+        $invoice = $this->workflow->issue(
+            $this->workflow->createDraft([
+                'company_id' => $this->company->id,
+                'document_type' => 'invoice',
+                'items' => [['description' => 'X', 'quantity' => 1, 'unit_price' => 500]],
+            ])->id
+        );
+
+        $payment = $this->workflow->recordPayment([
+            'company_id' => $this->company->id,
+            'amount' => 500,
+            'reference_number' => 'TXN-9',
+            'create_official_receipt' => true,
+            'allocations' => [['document_id' => $invoice->id, 'amount' => 500]],
+        ]);
+
+        $receipt = $payment->receiptDocument;
+        $this->assertNotNull($receipt);
+        $this->assertCount(1, $receipt->items);
+        $this->assertStringContainsString($invoice->official_number, $receipt->items->first()->description);
     }
 
     public function test_invalid_conversion_target_rejected(): void

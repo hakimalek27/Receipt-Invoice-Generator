@@ -27,6 +27,8 @@ class DocumentAttachmentController extends Controller
             'file' => [
                 'required',
                 'file',
+                // 10240 KB = 10 MB. Must stay aligned with PHP-FPM upload_max_filesize
+                // (public/.user.ini) and nginx client_max_body_size (deploy/nginx).
                 'max:10240',
                 'mimes:jpg,jpeg,png,webp,pdf',
                 'mimetypes:image/jpeg,image/png,image/webp,application/pdf',
@@ -108,7 +110,7 @@ class DocumentAttachmentController extends Controller
     private function scopedDocument(Request $request, int $documentId): Document
     {
         $document = Document::findOrFail($documentId);
-        if ($document->company_id !== $request->user()->company_id && ! $request->user()->isSuperAdmin()) {
+        if ($document->company_id !== \App\Services\ActiveCompanyResolver::resolve($request->user(), $request) && ! $request->user()->isSuperAdmin()) {
             abort(403, 'Company scope violation');
         }
 

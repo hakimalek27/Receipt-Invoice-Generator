@@ -5,6 +5,8 @@
     $totalLabel = $totalLabel ?? 'Grand Total';
     $noteLabel = $noteLabel ?? 'Notes';
     $termsLabel = $termsLabel ?? 'Terms';
+    $brand = $brand ?? [];
+    $brandPrimary = $brand['primary'] ?? '#1a3a5c';
 @endphp
 <!DOCTYPE html>
 <html>
@@ -13,22 +15,22 @@
     <style>
         @page { margin: 15mm 12mm 18mm 12mm; }
         body { font-family: DejaVu Sans, sans-serif; font-size: 10pt; color: #222; }
-        .header { border-bottom: 2px solid #1a3a5c; padding-bottom: 8px; margin-bottom: 12px; }
-        .header h1 { font-size: 14pt; margin: 0; color: #1a3a5c; }
+        .header { border-bottom: 2px solid {{ $brandPrimary }}; padding-bottom: 8px; margin-bottom: 12px; }
+        .header h1 { font-size: 14pt; margin: 0; color: {{ $brandPrimary }}; }
         .header .company-details { font-size: 8.5pt; color: #555; }
-        .doc-title { text-align: right; font-size: 18pt; font-weight: bold; color: #1a3a5c; margin-top: -18px; }
+        .doc-title { text-align: right; font-size: 18pt; font-weight: bold; color: {{ $brandPrimary }}; margin-top: -18px; }
         .meta { display: table; width: 100%; margin-bottom: 12px; }
         .meta .left, .meta .right { display: table-cell; width: 50%; vertical-align: top; }
         .meta .right { text-align: right; }
         .meta label { font-weight: bold; font-size: 8pt; color: #666; text-transform: uppercase; }
         table { width: 100%; border-collapse: collapse; }
         table.items { margin-bottom: 10px; }
-        table.items th { background: #1a3a5c; color: white; padding: 6px 4px; font-size: 8pt; text-align: left; }
+        table.items th { background: {{ $brandPrimary }}; color: white; padding: 6px 4px; font-size: 8pt; text-align: left; }
         table.items td { padding: 5px 4px; border-bottom: 1px solid #e0e0e0; font-size: 8.5pt; vertical-align: top; page-break-inside: avoid; }
         .text-right { text-align: right; }
         .totals { margin-left: auto; width: 42%; }
         .totals td { padding: 4px; font-size: 9.5pt; }
-        .totals .grand { font-weight: bold; font-size: 11pt; border-top: 2px solid #1a3a5c; }
+        .totals .grand { font-weight: bold; font-size: 11pt; border-top: 2px solid {{ $brandPrimary }}; }
         .amount-words { font-size: 8pt; font-weight: bold; margin: 8px 0; padding: 6px; background: #f5f5f5; border: 1px solid #ddd; }
         .footer-block { margin-top: 12px; font-size: 8.5pt; }
         .signature { margin-top: 34px; width: 45%; border-top: 1px solid #333; text-align: center; padding-top: 6px; font-size: 8pt; }

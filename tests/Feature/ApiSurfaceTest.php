@@ -64,6 +64,7 @@ class ApiSurfaceTest extends TestCase
             ['POST', 'api/documents/{id}/convert'],
             ['GET', 'api/documents/{id}/pdf'],
             ['POST', 'api/payments'],
+            ['POST', 'api/payments/{payment}/generate-receipt'],
             ['POST', 'api/documents/{document}/attachments'],
             ['GET', 'api/customers'],
             ['POST', 'api/products'],

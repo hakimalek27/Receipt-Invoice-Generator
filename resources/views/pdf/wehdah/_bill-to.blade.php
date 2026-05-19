@@ -1,0 +1,37 @@
+@php
+    $label = $label ?? 'Bill To:';
+    $customerLines = [];
+    if ($customer) {
+        $rawAddress = (string) ($customer->address ?? '');
+        if ($rawAddress !== '') {
+            $customerLines = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $rawAddress))));
+        }
+    }
+    $attn = $customer->contact_person ?? null;
+    $tel = $customer->phone ?? null;
+    $email = $customer->email ?? null;
+    $fax = $customer->fax ?? null;
+@endphp
+<div class="ws-billto-label">{{ $label }}</div>
+@if($customer)
+    <div class="ws-billto-name">{{ $customer->name }}</div>
+    @foreach($customerLines as $line)
+        <div class="ws-billto-line">{{ $line }}</div>
+    @endforeach
+    <table class="ws-billto-table">
+        @if($attn)
+            <tr><td class="ws-billto-key">Attn:</td><td class="ws-billto-val">{{ $attn }}</td></tr>
+        @endif
+        @if($tel)
+            <tr><td class="ws-billto-key">Tel:</td><td class="ws-billto-val">{{ $tel }}</td></tr>
+        @endif
+        @if($email)
+            <tr><td class="ws-billto-key">Email:</td><td class="ws-billto-val">{{ $email }}</td></tr>
+        @endif
+        @if($fax)
+            <tr><td class="ws-billto-key">Fax:</td><td class="ws-billto-val">{{ $fax }}</td></tr>
+        @endif
+    </table>
+@else
+    <div class="ws-billto-name">Walk-in Customer</div>
+@endif

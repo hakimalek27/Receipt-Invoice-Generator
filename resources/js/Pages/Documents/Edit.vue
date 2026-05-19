@@ -1,19 +1,34 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { apiFetch, money, today } from '@/lib/api';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import { computed, reactive, ref } from 'vue';
 
 const props = defineProps({
     document: Object,
+    company: Object,
     customers: Array,
     products: Array,
     documentTypes: Array,
+    statusHistory: { type: Array, default: () => [] },
 });
+
+const page = usePage();
+const isAdmin = computed(() => {
+    const role = page.props?.auth?.user?.role;
+    return role === 'admin' || role === 'super_admin';
+});
+const isPgg = computed(() => props.company?.code === 'PGG');
 
 const initialItems = props.document?.items?.length
     ? props.document.items
     : [{ description: '', quantity: 1, uom: 'unit', unit_price: 0, discount: 0, tax_type: '', tax_rate: 0, tax_amount: 0 }];
+
+// MIRRORS app/Services/DocumentWorkflowService.php::CONVERSION_TARGETS
+const CONVERSION_TARGETS = {
+    quotation: ['invoice', 'delivery_order'],
+    invoice: ['delivery_order'],
+};
 
 const form = reactive({
     id: props.document?.id ?? null,
@@ -21,12 +36,17 @@ const form = reactive({
     official_number: props.document?.official_number ?? null,
     document_type: props.document?.document_type ?? 'invoice',
     customer_id: props.document?.customer_id ?? '',
+    customer_name: props.document?.customer?.name ?? '',
     document_date: props.document?.document_date?.slice(0, 10) ?? today(),
     due_date: props.document?.due_date?.slice(0, 10) ?? '',
     currency: props.document?.currency ?? 'MYR',
     fx_rate: props.document?.fx_rate ?? '',
     terms: props.document?.terms ?? '',
     notes: props.document?.notes ?? '',
+    product_line: props.document?.product_line ?? '',
+    include_arabic_salutation: props.document
+        ? Boolean(props.document.include_arabic_salutation)
+        : (props.company?.code === 'PGG'),
     show_amount_in_words: Boolean(props.document?.show_amount_in_words),
     amount_in_words_locale: props.document?.amount_in_words_locale ?? 'ms_MY',
     amount_in_words_currency: props.document?.amount_in_words_currency ?? 'MYR',
@@ -35,10 +55,17 @@ const form = reactive({
     attachments: props.document?.attachments ?? [],
     pdf_renders: props.document?.pdf_renders ?? [],
     items: initialItems.map((item) => ({
+        product_id: item.product_id ?? null,
+        product_name: item.product_id
+            ? (props.products?.find((p) => p.id === item.product_id)?.name ?? '')
+            : '',
         description: item.description ?? '',
+        section_header: item.section_header ?? '',
+        image_url: item.image_url ?? '',
         quantity: Number(item.quantity ?? 1),
         uom: item.uom ?? 'unit',
         unit_price: Number(item.unit_price ?? 0),
+        cost_unit: item.cost_unit != null ? Number(item.cost_unit) : null,
         discount: Number(item.discount ?? 0),
         tax_type: item.tax_type ?? '',
         tax_rate: Number(item.tax_rate ?? 0),
@@ -48,15 +75,29 @@ const form = reactive({
     })),
 });
 
+const totalMargin = computed(() => form.items.reduce((sum, item) => {
+    if (item.cost_unit == null) return sum;
+    return sum + ((Number(item.unit_price || 0) - Number(item.cost_unit || 0)) * Number(item.quantity || 0));
+}, 0));
+const marginRate = computed(() => {
+    const revenue = form.items.reduce((sum, item) => {
+        if (item.cost_unit == null) return sum;
+        return sum + (Number(item.unit_price || 0) * Number(item.quantity || 0));
+    }, 0);
+    return revenue > 0 ? (totalMargin.value / revenue) * 100 : 0;
+});
+
 const busy = ref(false);
 const message = ref('');
 const error = ref('');
 const issueOpen = ref(false);
 const confirmedTotal = ref('');
 const lastPreviewHash = ref(null);
-const artworkFile = ref(null);
+const draggedAttachmentIndex = ref(null);
+const artworkFiles = ref([]);
 const artworkCaption = ref('');
-const convertTarget = ref('invoice');
+const availableConvertTargets = computed(() => CONVERSION_TARGETS[form.document_type] || []);
+const convertTarget = ref(availableConvertTargets.value[0] ?? 'invoice');
 const voidReason = ref('');
 
 const isDraft = computed(() => form.status === 'draft');
@@ -78,7 +119,13 @@ function applyDocument(document) {
 }
 
 function addItem() {
-    form.items.push({ description: '', quantity: 1, uom: 'unit', unit_price: 0, discount: 0, tax_type: '', tax_rate: 0, tax_amount: 0, classification_code: '', tax_exemption_reason: '' });
+    form.items.push({
+        product_id: null, product_name: '',
+        description: '', section_header: '', image_url: '',
+        quantity: 1, uom: 'unit', unit_price: 0, cost_unit: null,
+        discount: 0, tax_type: '', tax_rate: 0, tax_amount: 0,
+        classification_code: '', tax_exemption_reason: '',
+    });
 }
 
 function removeItem(index) {
@@ -87,10 +134,19 @@ function removeItem(index) {
     }
 }
 
-function productPicked(index, event) {
-    const product = props.products.find((item) => String(item.id) === event.target.value);
-    if (!product) return;
+function productAutofill(index) {
+    const name = form.items[index].product_name?.trim();
+    if (!name) {
+        form.items[index].product_id = null;
+        return;
+    }
+    const product = props.products?.find((p) => p.name === name);
+    if (!product) {
+        form.items[index].product_id = null;
+        return;
+    }
     Object.assign(form.items[index], {
+        product_id: product.id,
         description: product.description || product.name,
         uom: product.uom || 'unit',
         unit_price: Number(product.default_price || 0),
@@ -101,21 +157,34 @@ function productPicked(index, event) {
 }
 
 function payload() {
+    const customerMatch = props.customers?.find((c) => c.name === form.customer_name?.trim());
     return {
         document_type: form.document_type,
-        customer_id: form.customer_id || null,
+        customer_id: customerMatch?.id ?? null,
         document_date: form.document_date,
         due_date: form.due_date || null,
         currency: form.currency,
         fx_rate: form.fx_rate || null,
         terms: form.terms || null,
         notes: form.notes || null,
+        product_line: form.product_line || null,
+        include_arabic_salutation: form.include_arabic_salutation,
         show_amount_in_words: form.show_amount_in_words,
         amount_in_words_locale: form.amount_in_words_locale,
         amount_in_words_currency: form.amount_in_words_currency,
         items: form.items
             .filter((item) => item.description.trim() !== '')
-            .map((item, index) => ({ ...item, sort_order: index })),
+            .map((item, index) => {
+                const productMatch = props.products?.find((p) => p.name === item.product_name?.trim());
+                return {
+                    ...item,
+                    product_id: productMatch?.id ?? null,
+                    section_header: item.section_header?.trim() || null,
+                    image_url: item.image_url?.trim() || null,
+                    cost_unit: item.cost_unit === '' || item.cost_unit == null ? null : Number(item.cost_unit),
+                    sort_order: index,
+                };
+            }),
     };
 }
 
@@ -149,26 +218,134 @@ async function previewPdf(paper = 'a4') {
     window.open(`/api/documents/${form.id}/pdf?paper=${paper}`, '_blank');
 }
 
+const UPLOAD_MAX_BYTES = 10 * 1024 * 1024; // Aligned with PHP-FPM + nginx (10 MB)
+
 async function uploadArtwork() {
     if (!form.id) {
         await saveDraft();
     }
-    if (!form.id || !artworkFile.value) return;
+    if (!form.id || artworkFiles.value.length === 0) return;
+
+    const tooBig = artworkFiles.value.filter((f) => f.size > UPLOAD_MAX_BYTES);
+    if (tooBig.length > 0) {
+        const names = tooBig.map((f) => `${f.name} (${(f.size / 1024 / 1024).toFixed(2)} MB)`).join(', ');
+        error.value = `These files exceed the 10 MB server upload limit: ${names}. Please compress or split the files.`;
+        return;
+    }
+
     busy.value = true;
     error.value = '';
-    const body = new FormData();
-    body.append('file', artworkFile.value);
-    body.append('caption', artworkCaption.value || artworkFile.value.name);
-    body.append('include_in_pdf', '1');
+    const captionBase = artworkCaption.value.trim();
+    let uploaded = 0;
+    let failed = 0;
     try {
-        const attachment = await apiFetch(`/api/documents/${form.id}/attachments`, { method: 'POST', body });
-        form.attachments.push(attachment);
-        artworkFile.value = null;
+        for (let i = 0; i < artworkFiles.value.length; i++) {
+            const file = artworkFiles.value[i];
+            const body = new FormData();
+            body.append('file', file);
+            const cap = captionBase
+                ? (artworkFiles.value.length > 1 ? `${captionBase} #${i + 1}` : captionBase)
+                : file.name;
+            body.append('caption', cap);
+            body.append('include_in_pdf', '1');
+            try {
+                const attachment = await apiFetch(`/api/documents/${form.id}/attachments`, { method: 'POST', body });
+                form.attachments.push(attachment);
+                uploaded++;
+            } catch (innerException) {
+                failed++;
+                error.value = `${file.name}: ${innerException.message}`;
+            }
+        }
+        artworkFiles.value = [];
         artworkCaption.value = '';
-        message.value = 'Artwork uploaded.';
-    } catch (exception) {
-        error.value = exception.message;
+        if (failed === 0) {
+            message.value = `${uploaded} artwork uploaded.`;
+        } else {
+            message.value = `${uploaded} uploaded, ${failed} failed.`;
+        }
     } finally {
+        busy.value = false;
+    }
+}
+
+async function removeAttachment(attachmentId) {
+    if (!form.id || !attachmentId) return;
+    if (!confirm('Delete this artwork attachment?')) return;
+    busy.value = true;
+    error.value = '';
+    try {
+        await apiFetch(`/api/documents/${form.id}/attachments/${attachmentId}`, { method: 'DELETE' });
+        form.attachments = form.attachments.filter((a) => a.id !== attachmentId);
+        message.value = 'Artwork removed.';
+    } catch (e) {
+        error.value = e.message;
+    } finally {
+        busy.value = false;
+    }
+}
+
+async function moveAttachment(index, direction) {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= form.attachments.length) return;
+    const reordered = [...form.attachments];
+    [reordered[index], reordered[newIndex]] = [reordered[newIndex], reordered[index]];
+    const payload = reordered.map((a, i) => ({ id: a.id, sort_order: i + 1 }));
+    busy.value = true;
+    error.value = '';
+    try {
+        await apiFetch(`/api/documents/${form.id}/attachments/reorder`, {
+            method: 'PATCH',
+            body: JSON.stringify({ attachments: payload }),
+        });
+        form.attachments = reordered.map((a, i) => ({ ...a, sort_order: i + 1 }));
+    } catch (e) {
+        error.value = e.message;
+    } finally {
+        busy.value = false;
+    }
+}
+
+function onAttachmentDragStart(index) {
+    draggedAttachmentIndex.value = index;
+}
+
+function onAttachmentDragEnd() {
+    draggedAttachmentIndex.value = null;
+}
+
+async function onAttachmentDrop(targetIndex) {
+    const fromIndex = draggedAttachmentIndex.value;
+    draggedAttachmentIndex.value = null;
+    if (fromIndex === null || fromIndex === targetIndex) return;
+    const reordered = [...form.attachments];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
+    const payload = reordered.map((a, i) => ({ id: a.id, sort_order: i + 1 }));
+    busy.value = true;
+    error.value = '';
+    try {
+        await apiFetch(`/api/documents/${form.id}/attachments/reorder`, {
+            method: 'PATCH',
+            body: JSON.stringify({ attachments: payload }),
+        });
+        form.attachments = reordered.map((a, i) => ({ ...a, sort_order: i + 1 }));
+    } catch (e) {
+        error.value = e.message;
+    } finally {
+        busy.value = false;
+    }
+}
+
+async function duplicateThisDocument() {
+    if (!form.id) return;
+    if (!confirm('Duplicate this document as a new draft?')) return;
+    busy.value = true;
+    try {
+        const fresh = await apiFetch(`/api/documents/${form.id}/duplicate`, { method: 'POST' });
+        window.location.href = `/documents/${fresh.id}`;
+    } catch (e) {
+        error.value = e.message;
         busy.value = false;
     }
 }
@@ -220,6 +397,16 @@ async function voidDocument() {
     }
 }
 
+function statusColor(status) {
+    return {
+        draft: 'text-amber-700',
+        issued: 'text-emerald-700',
+        converted: 'text-indigo-700',
+        void: 'text-red-700',
+        cancelled: 'text-gray-600',
+    }[status] || 'text-gray-700';
+}
+
 async function convertDocument() {
     busy.value = true;
     error.value = '';
@@ -250,6 +437,7 @@ async function convertDocument() {
                     <Link :href="route('documents.index')" class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700">Back</Link>
                     <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" :disabled="busy || !form.id" @click="previewPdf('a4')">Preview A4</button>
                     <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" :disabled="busy || !form.id" @click="previewPdf('60mm')">60mm</button>
+                    <button v-if="form.id" class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" :disabled="busy" @click="duplicateThisDocument" title="Clone as new draft">Duplicate</button>
                     <button class="rounded-md bg-gray-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="busy || !isDraft" @click="saveDraft">Save Draft</button>
                     <button class="rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="busy || !isDraft || !form.id" @click="openIssue">Issue</button>
                 </div>
@@ -262,6 +450,32 @@ async function convertDocument() {
                     <div v-if="message" class="rounded border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{{ message }}</div>
                     <div v-if="error" class="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{ error }}</div>
 
+                    <div v-if="document?.converted_from || (document?.converted_to?.length)"
+                         class="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
+                        <div v-if="document.converted_from" class="flex flex-wrap items-baseline gap-1">
+                            <span class="font-medium">Source:</span>
+                            <Link :href="`/documents/${document.converted_from.id}`" class="font-mono underline">
+                                {{ document.converted_from.official_number || `Draft #${document.converted_from.id}` }}
+                            </Link>
+                            <span class="text-xs text-indigo-700">({{ document.converted_from.document_type }} · {{ document.converted_from.status }})</span>
+                        </div>
+                        <div v-if="document?.converted_to?.length" class="mt-1">
+                            <span class="font-medium">Converted to:</span>
+                            <ul class="ml-4 list-disc">
+                                <li v-for="child in document.converted_to" :key="child.id">
+                                    <Link :href="`/documents/${child.id}`" class="font-mono underline">
+                                        {{ child.official_number || `Draft #${child.id}` }}
+                                    </Link>
+                                    <span class="text-xs text-indigo-700">({{ child.document_type }} · {{ child.status }})</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <datalist id="customer-options">
+                        <option v-for="c in customers" :key="c.id" :value="c.name"></option>
+                    </datalist>
+
                     <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
                         <div class="grid gap-4 md:grid-cols-4">
                             <label class="text-sm font-medium text-gray-700">
@@ -272,10 +486,10 @@ async function convertDocument() {
                             </label>
                             <label class="text-sm font-medium text-gray-700">
                                 Customer
-                                <select v-model="form.customer_id" :disabled="!isDraft" class="mt-1 w-full rounded-md border-gray-300 text-sm">
-                                    <option value="">Walk-in Customer</option>
-                                    <option v-for="customer in customers" :key="customer.id" :value="customer.id">{{ customer.name }}</option>
-                                </select>
+                                <input v-model="form.customer_name" :disabled="!isDraft"
+                                       list="customer-options"
+                                       class="mt-1 w-full rounded-md border-gray-300 text-sm"
+                                       placeholder="Type or pick (blank = walk-in)">
                             </label>
                             <label class="text-sm font-medium text-gray-700">
                                 Date
@@ -307,6 +521,23 @@ async function convertDocument() {
                                 </select>
                             </label>
                         </div>
+                        <div v-if="isPgg" class="mt-4 grid gap-4 rounded-md border border-indigo-100 bg-indigo-50 p-4 md:grid-cols-2">
+                            <label class="text-sm font-medium text-indigo-900">
+                                Product Line
+                                <select v-model="form.product_line" :disabled="!isDraft" class="mt-1 w-full rounded-md border-indigo-200 text-sm">
+                                    <option value="">Standard</option>
+                                    <option value="scentury">SCENTURY</option>
+                                </select>
+                                <span class="mt-1 block text-xs text-indigo-700">SCENTURY: gold accent + sub-line "SCENTURY by Persada".</span>
+                            </label>
+                            <label class="flex items-start gap-2 pt-6 text-sm font-medium text-indigo-900">
+                                <input v-model="form.include_arabic_salutation" :disabled="!isDraft" type="checkbox" class="mt-0.5 rounded border-indigo-300">
+                                <span>
+                                    Include Arabic Salutation
+                                    <span class="mt-0.5 block text-xs font-normal text-indigo-700">Renders Bismillah + Assalamualaikum block atop page 1.</span>
+                                </span>
+                            </label>
+                        </div>
                     </div>
 
                     <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
@@ -322,31 +553,52 @@ async function convertDocument() {
                                         <th class="px-4 py-3">Qty</th>
                                         <th class="px-4 py-3">UOM</th>
                                         <th class="px-4 py-3">Rate</th>
+                                        <th v-if="isAdmin" class="px-4 py-3" title="Internal cost per unit (admin only, not in PDF)">Cost</th>
                                         <th class="px-4 py-3">Disc</th>
                                         <th class="px-4 py-3">Tax</th>
+                                        <th v-if="isAdmin" class="px-4 py-3 text-right" title="(Unit price &minus; cost) &times; qty">Margin</th>
                                         <th class="px-4 py-3 text-right">Total</th>
                                         <th class="px-4 py-3"></th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100">
                                     <tr v-for="(item, index) in form.items" :key="index">
-                                        <td class="px-4 py-3">
-                                            <select class="mb-2 w-full rounded-md border-gray-300 text-xs" :disabled="!isDraft" @change="productPicked(index, $event)">
-                                                <option value="">Product lookup</option>
-                                                <option v-for="product in products" :key="product.id" :value="product.id">{{ product.name }}</option>
-                                            </select>
+                                        <td class="px-4 py-3 align-top">
+                                            <input v-model="item.section_header" :disabled="!isDraft"
+                                                   class="mb-2 w-full rounded-md border-amber-200 bg-amber-50 text-xs"
+                                                   placeholder="Section heading (e.g. Bilik Muaazzin) &mdash; optional">
+                                            <input v-model="item.product_name" :disabled="!isDraft"
+                                                   :list="`product-options-${index}`"
+                                                   @change="productAutofill(index)"
+                                                   class="mb-2 w-full rounded-md border-gray-300 text-xs"
+                                                   placeholder="Product lookup (type or pick)">
+                                            <datalist :id="`product-options-${index}`">
+                                                <option v-for="product in products" :key="product.id" :value="product.name"></option>
+                                            </datalist>
                                             <textarea v-model="item.description" :disabled="!isDraft" rows="2" class="w-72 rounded-md border-gray-300 text-sm" placeholder="Item description"></textarea>
+                                            <input v-model="item.image_url" :disabled="!isDraft"
+                                                   class="mt-2 w-72 rounded-md border-gray-300 font-mono text-xs"
+                                                   placeholder="Image data URI (data:image/png;base64,...) &mdash; optional">
                                         </td>
-                                        <td class="px-4 py-3"><input v-model.number="item.quantity" :disabled="!isDraft" type="number" step="0.0001" class="w-20 rounded-md border-gray-300 text-sm"></td>
-                                        <td class="px-4 py-3"><input v-model="item.uom" :disabled="!isDraft" class="w-20 rounded-md border-gray-300 text-sm"></td>
-                                        <td class="px-4 py-3"><input v-model.number="item.unit_price" :disabled="!isDraft || !canPrice" type="number" step="0.01" class="w-24 rounded-md border-gray-300 text-sm"></td>
-                                        <td class="px-4 py-3"><input v-model.number="item.discount" :disabled="!isDraft || !canPrice" type="number" step="0.01" class="w-20 rounded-md border-gray-300 text-sm"></td>
-                                        <td class="px-4 py-3">
+                                        <td class="px-4 py-3 align-top"><input v-model.number="item.quantity" :disabled="!isDraft" type="number" step="0.0001" class="w-20 rounded-md border-gray-300 text-sm"></td>
+                                        <td class="px-4 py-3 align-top"><input v-model="item.uom" :disabled="!isDraft" class="w-20 rounded-md border-gray-300 text-sm"></td>
+                                        <td class="px-4 py-3 align-top"><input v-model.number="item.unit_price" :disabled="!isDraft || !canPrice" type="number" step="0.01" class="w-24 rounded-md border-gray-300 text-sm"></td>
+                                        <td v-if="isAdmin" class="px-4 py-3 align-top">
+                                            <input v-model.number="item.cost_unit" :disabled="!isDraft || !canPrice" type="number" step="0.01" class="w-24 rounded-md border-amber-200 bg-amber-50 text-sm" placeholder="optional">
+                                        </td>
+                                        <td class="px-4 py-3 align-top"><input v-model.number="item.discount" :disabled="!isDraft || !canPrice" type="number" step="0.01" class="w-20 rounded-md border-gray-300 text-sm"></td>
+                                        <td class="px-4 py-3 align-top">
                                             <input v-model="item.tax_type" :disabled="!isDraft || !canPrice" class="mb-2 w-24 rounded-md border-gray-300 text-sm" placeholder="SST">
                                             <input v-model.number="item.tax_amount" :disabled="!isDraft || !canPrice" type="number" step="0.01" class="w-24 rounded-md border-gray-300 text-sm">
                                         </td>
-                                        <td class="px-4 py-3 text-right font-medium">{{ money((Number(item.quantity || 0) * Number(item.unit_price || 0)) - Number(item.discount || 0) + Number(item.tax_amount || 0), form.currency) }}</td>
-                                        <td class="px-4 py-3 text-right"><button class="text-sm font-medium text-red-700" :disabled="!isDraft" @click="removeItem(index)">Remove</button></td>
+                                        <td v-if="isAdmin" class="px-4 py-3 align-top text-right font-mono text-xs text-amber-700">
+                                            <span v-if="item.cost_unit != null && item.cost_unit !== ''">
+                                                {{ money((Number(item.unit_price || 0) - Number(item.cost_unit || 0)) * Number(item.quantity || 0), form.currency) }}
+                                            </span>
+                                            <span v-else class="text-gray-300">&mdash;</span>
+                                        </td>
+                                        <td class="px-4 py-3 align-top text-right font-medium">{{ money((Number(item.quantity || 0) * Number(item.unit_price || 0)) - Number(item.discount || 0) + Number(item.tax_amount || 0), form.currency) }}</td>
+                                        <td class="px-4 py-3 align-top text-right"><button class="text-sm font-medium text-red-700" :disabled="!isDraft" @click="removeItem(index)">Remove</button></td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -367,17 +619,41 @@ async function convertDocument() {
                     <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
                         <div class="flex items-center justify-between">
                             <h3 class="text-sm font-semibold text-gray-900">Artwork Attachments</h3>
-                            <span class="text-xs text-gray-500">Private storage · JPG/PNG/WEBP/PDF only</span>
+                            <span class="text-xs text-gray-500">JPG/PNG/WEBP/PDF · max 10 MB per file</span>
                         </div>
                         <div class="mt-4 grid gap-3 md:grid-cols-[1fr_220px_auto]">
-                            <input type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" :disabled="!isDraft" class="rounded-md border border-gray-300 px-3 py-2 text-sm" @change="artworkFile = $event.target.files[0]">
-                            <input v-model="artworkCaption" :disabled="!isDraft" class="rounded-md border-gray-300 text-sm" placeholder="Caption">
-                            <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 disabled:opacity-50" :disabled="busy || !isDraft || !artworkFile" @click="uploadArtwork">Upload</button>
+                            <input type="file" multiple accept=".jpg,.jpeg,.png,.webp,.pdf" :disabled="!isDraft" class="rounded-md border border-gray-300 px-3 py-2 text-sm" @change="artworkFiles = Array.from($event.target.files)">
+                            <input v-model="artworkCaption" :disabled="!isDraft" class="rounded-md border-gray-300 text-sm" placeholder="Caption (prefix; #N appended for multi-upload)">
+                            <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 disabled:opacity-50" :disabled="busy || !isDraft || artworkFiles.length === 0" @click="uploadArtwork">Upload {{ artworkFiles.length > 1 ? `(${artworkFiles.length})` : '' }}</button>
+                        </div>
+                        <div v-if="artworkFiles.length > 0" class="mt-2 text-xs text-gray-600">
+                            Selected: {{ artworkFiles.map((f) => `${f.name} (${(f.size / 1024 / 1024).toFixed(2)} MB)`).join(', ') }}
                         </div>
                         <div class="mt-3 divide-y divide-gray-100 text-sm">
-                            <div v-for="attachment in form.attachments" :key="attachment.id" class="flex items-center justify-between py-2">
-                                <span>{{ attachment.caption || attachment.original_name }}</span>
-                                <span class="text-xs text-gray-500">{{ attachment.mime_type }}</span>
+                            <div v-for="(attachment, index) in form.attachments" :key="attachment.id"
+                                 class="flex items-center justify-between gap-3 py-2 transition"
+                                 :class="{
+                                     'cursor-move': isDraft,
+                                     'opacity-40': draggedAttachmentIndex === index,
+                                     'border-y-2 border-indigo-400 bg-indigo-50': draggedAttachmentIndex !== null && draggedAttachmentIndex !== index,
+                                 }"
+                                 :draggable="isDraft && !busy"
+                                 @dragstart="onAttachmentDragStart(index)"
+                                 @dragover.prevent
+                                 @drop.prevent="onAttachmentDrop(index)"
+                                 @dragend="onAttachmentDragEnd">
+                                <div class="flex flex-1 items-center gap-2 truncate">
+                                    <span class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-600">{{ index + 1 }}</span>
+                                    <span class="truncate">{{ attachment.caption || attachment.original_name }}</span>
+                                    <span class="text-xs text-gray-400">·</span>
+                                    <span class="text-xs text-gray-500">{{ attachment.mime_type }}</span>
+                                    <span v-if="attachment.size_bytes" class="text-xs text-gray-400">· {{ (attachment.size_bytes / 1024).toFixed(0) }} KB</span>
+                                </div>
+                                <div class="flex shrink-0 items-center gap-1">
+                                    <button :disabled="!isDraft || busy || index === 0" @click="moveAttachment(index, -1)" class="rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 disabled:opacity-30" title="Move up">↑</button>
+                                    <button :disabled="!isDraft || busy || index === form.attachments.length - 1" @click="moveAttachment(index, 1)" class="rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 disabled:opacity-30" title="Move down">↓</button>
+                                    <button :disabled="!isDraft || busy" @click="removeAttachment(attachment.id)" class="rounded border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 disabled:opacity-30">Remove</button>
+                                </div>
                             </div>
                             <div v-if="form.attachments.length === 0" class="py-4 text-gray-500">No artwork uploaded.</div>
                         </div>
@@ -385,6 +661,14 @@ async function convertDocument() {
                 </section>
 
                 <aside class="space-y-5">
+                    <div v-if="isAdmin" class="rounded-lg border border-amber-200 bg-amber-50 p-5 shadow-sm">
+                        <h3 class="text-sm font-semibold text-amber-900">Margin <span class="text-xs font-normal text-amber-700">(admin only &middot; not in PDF)</span></h3>
+                        <dl class="mt-3 space-y-2 text-sm">
+                            <div class="flex justify-between"><dt>Total Margin</dt><dd class="font-mono">{{ money(totalMargin, form.currency) }}</dd></div>
+                            <div class="flex justify-between"><dt>Margin %</dt><dd class="font-mono">{{ marginRate.toFixed(1) }}%</dd></div>
+                        </dl>
+                        <p class="mt-3 text-xs text-amber-700">Set <code>Cost</code> per row to track margin. Customers do not see this column on the PDF.</p>
+                    </div>
                     <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
                         <h3 class="text-sm font-semibold text-gray-900">Totals</h3>
                         <dl class="mt-4 space-y-2 text-sm">
@@ -408,14 +692,33 @@ async function convertDocument() {
                             <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" @click="previewPdf('60mm')">Download 60mm</button>
                         </div>
                         <div v-if="form.status === 'issued'" class="mt-5 space-y-3">
-                            <select v-model="convertTarget" class="w-full rounded-md border-gray-300 text-sm">
-                                <option value="invoice">invoice</option>
-                                <option value="delivery_order">delivery_order</option>
-                            </select>
-                            <button class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" @click="convertDocument">Convert</button>
+                            <div v-if="availableConvertTargets.length > 0" class="space-y-2">
+                                <select v-model="convertTarget" class="w-full rounded-md border-gray-300 text-sm">
+                                    <option v-for="target in availableConvertTargets" :key="target" :value="target">{{ target }}</option>
+                                </select>
+                                <button class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" @click="convertDocument">Convert to {{ convertTarget }}</button>
+                            </div>
                             <textarea v-model="voidReason" rows="2" class="w-full rounded-md border-gray-300 text-sm" placeholder="Void reason"></textarea>
                             <button class="w-full rounded-md bg-red-700 px-3 py-2 text-sm font-semibold text-white" @click="voidDocument">Void</button>
                         </div>
+                    </div>
+
+                    <div v-if="form.id && statusHistory.length > 0" class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+                        <h3 class="text-sm font-semibold text-gray-900">Status Timeline</h3>
+                        <ol class="mt-3 space-y-3 text-xs">
+                            <li v-for="event in statusHistory" :key="event.id" class="border-l-2 border-gray-200 pl-3">
+                                <div class="flex items-baseline justify-between">
+                                    <span class="font-mono font-semibold" :class="statusColor(event.to_status)">
+                                        {{ event.from_status ? `${event.from_status} → ${event.to_status}` : event.to_status }}
+                                    </span>
+                                    <span class="text-gray-400">{{ event.created_at?.slice(0, 16).replace('T', ' ') }}</span>
+                                </div>
+                                <div v-if="event.changed_by" class="mt-0.5 text-gray-600">by {{ event.changed_by }}</div>
+                                <div v-if="event.reason" class="mt-1 rounded bg-red-50 px-2 py-1 text-red-700">
+                                    <span class="font-semibold">Reason:</span> {{ event.reason }}
+                                </div>
+                            </li>
+                        </ol>
                     </div>
                 </aside>
             </div>

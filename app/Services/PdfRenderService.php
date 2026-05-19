@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Company;
 use App\Models\Document;
+use App\Models\Payment;
 use App\Models\PdfRender;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\File;
@@ -15,6 +16,7 @@ class PdfRenderService
 {
     public function __construct(
         private readonly AmountInWordsService $amountInWords,
+        private readonly PdfBoilerplateService $boilerplate,
     ) {}
 
     /**
@@ -136,13 +138,26 @@ class PdfRenderService
             'WS' => [
                 'invoice' => 'pdf.wehdah.invoice',
                 'quotation' => 'pdf.wehdah.quotation',
+                'delivery_order' => 'pdf.wehdah.delivery_order',
+                'official_receipt' => 'pdf.wehdah.official_receipt',
             ],
             'NCS' => [
                 'invoice' => 'pdf.nasceria.invoice',
                 'quotation' => 'pdf.nasceria.quotation',
+                'delivery_order' => 'pdf.nasceria.delivery_order',
+                'official_receipt' => 'pdf.nasceria.official_receipt',
             ],
             'PGG' => [
                 'invoice' => 'pdf.persada.invoice',
+                'quotation' => 'pdf.persada.quotation',
+                'delivery_order' => 'pdf.persada.delivery_order',
+                'official_receipt' => 'pdf.persada.official_receipt',
+            ],
+            'VD' => [
+                'invoice' => 'pdf.virtuedamsel.invoice',
+                'quotation' => 'pdf.virtuedamsel.quotation',
+                'delivery_order' => 'pdf.virtuedamsel.delivery_order',
+                'official_receipt' => 'pdf.virtuedamsel.official_receipt',
             ],
         ];
 
@@ -197,13 +212,35 @@ class PdfRenderService
             );
         }
 
-        // Paginate items: ~15 items per page for A4 (rough estimate)
-        $perPage = $document->document_type === 'delivery_order' ? 20 : 15;
+        // Paginate items per A4: tuned per template family.
+        // Wehdah templates carry a taller header band + customer/bracket box, so they fit
+        // ~12 invoice rows on page 1 and ~15 on continuation pages; we chunk conservatively
+        // so the "Continued on next page" footer/totals always land on the right logical page.
+        $isWehdah = ($company?->code ?? null) === 'WS';
+        if ($document->document_type === 'delivery_order') {
+            $perPage = $isWehdah ? 24 : 20;
+        } elseif ($document->document_type === 'official_receipt') {
+            $perPage = $isWehdah ? 24 : 15;
+        } else {
+            $perPage = $isWehdah ? 18 : 15;
+        }
+        // Section header rows take vertical space too; trim per-page when any are present.
+        if ($document->items->whereNotNull('section_header')->isNotEmpty()) {
+            $perPage = max(10, $perPage - 1);
+        }
         $pages = $document->items->chunk($perPage);
         if ($pages->isEmpty()) {
             $pages = collect([collect()]);
         }
         $totalPages = $pages->count();
+
+        $rawBoilerplate = data_get($company, 'pdf_boilerplate');
+        $companyBoilerplate = null;
+        if (is_array($rawBoilerplate)) {
+            $companyBoilerplate = $rawBoilerplate;
+        } elseif (is_object($rawBoilerplate)) {
+            $companyBoilerplate = json_decode(json_encode($rawBoilerplate), true);
+        }
 
         return [
             'document' => $document,
@@ -215,8 +252,69 @@ class PdfRenderService
             'totalPages' => $totalPages,
             'attachments' => $this->attachmentPayloads($document),
             'amountWords' => $amountWords,
+            'payment' => $this->paymentPayload($document),
             'isLastPage' => false,
             'pageNumber' => 1,
+            'brand' => $this->brandPalette($company),
+            'boilerplate' => $this->boilerplate->resolve(
+                $companyBoilerplate,
+                $document->document_type,
+                $company?->name
+            ),
+        ];
+    }
+
+    private function brandPalette($company): array
+    {
+        if (! $company) {
+            return ['primary' => '#1a3a5c', 'secondary' => '#f0f4f8', 'accent' => '#16427a'];
+        }
+
+        $primary = data_get($company, 'brand_primary') ?: '#1a3a5c';
+        $secondary = data_get($company, 'brand_secondary') ?: '#f0f4f8';
+        $accent = data_get($company, 'brand_accent') ?: '#16427a';
+
+        $palette = [
+            'primary' => $primary,
+            'secondary' => $secondary,
+            'accent' => $accent,
+        ];
+
+        if ((data_get($company, 'code') ?? null) === 'PGG') {
+            $gradient = resource_path('views/pdf/persada/assets/header-gradient.png');
+            if (is_file($gradient)) {
+                $palette['header_image_data_uri'] = 'data:image/png;base64,'.base64_encode(file_get_contents($gradient));
+            }
+        }
+
+        return $palette;
+    }
+
+    private function paymentPayload(Document $document): ?array
+    {
+        if ($document->document_type !== 'official_receipt') {
+            return null;
+        }
+
+        $payment = Payment::with('allocations.document')
+            ->where('receipt_document_id', $document->id)
+            ->first();
+
+        if (! $payment) {
+            return null;
+        }
+
+        return [
+            'method' => $payment->method,
+            'reference_number' => $payment->reference_number,
+            'payment_date' => optional($payment->payment_date)->format('d/m/Y'),
+            'amount' => (float) $payment->amount,
+            'currency' => $payment->currency,
+            'allocations' => $payment->allocations->map(fn ($allocation) => [
+                'document_number' => $allocation->document?->official_number,
+                'document_type' => $allocation->document?->document_type,
+                'amount' => (float) $allocation->amount,
+            ])->all(),
         ];
     }
 

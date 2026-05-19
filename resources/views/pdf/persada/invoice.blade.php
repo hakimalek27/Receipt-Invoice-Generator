@@ -2,110 +2,106 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <style>
-        @page { margin: 13mm 12mm 18mm 12mm; }
-        body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 10pt; color: #111; }
-        .top-band { height: 14px; background: #16427a; border-radius: 0 10px 10px 0; margin: -5mm 0 12px -12mm; }
-        .header { display: table; width: 100%; border-bottom: 1.5px solid #18345d; padding-bottom: 10px; margin-bottom: 12px; }
-        .logo-mark { display: table-cell; width: 70px; vertical-align: middle; }
-        .logo-box { width: 54px; height: 54px; border: 7px solid #16427a; color: #149653; font-size: 20pt; font-weight: bold; text-align: center; line-height: 42px; }
-        .company { display: table-cell; vertical-align: middle; }
-        .company h1 { margin: 0; font-size: 15pt; letter-spacing: 0; }
-        .company .details { font-size: 8.5pt; line-height: 1.35; }
-        .contact { display: table-cell; width: 34%; vertical-align: middle; font-size: 8.5pt; line-height: 1.5; }
-        .doc-title { text-align: right; color: #16427a; font-size: 19pt; font-weight: bold; margin: 8px 0; }
-        .meta { display: table; width: 100%; margin: 10px 0; }
-        .meta .cell { display: table-cell; width: 50%; vertical-align: top; }
-        .right { text-align: right; }
-        table.items { width: 100%; border-collapse: collapse; margin-top: 8px; }
-        .items th { background: #16427a; color: white; padding: 6px 5px; font-size: 8pt; text-align: left; }
-        .items td { border-bottom: 1px solid #d8dee8; padding: 5px; font-size: 8.5pt; vertical-align: top; page-break-inside: avoid; }
-        .totals { width: 42%; margin-left: auto; border-collapse: collapse; margin-top: 10px; }
-        .totals td { padding: 4px 5px; }
-        .grand { color: #16427a; font-weight: bold; border-top: 2px solid #16427a; }
-        .amount-words { margin-top: 8px; border: 1px solid #16427a; padding: 6px; font-size: 8pt; font-weight: bold; }
-        .signature { margin-top: 36px; display: table; width: 100%; }
-        .signature .cell { display: table-cell; width: 50%; font-size: 8pt; }
-        .stamp { color: #16427a; border: 2px solid #16427a; border-radius: 50%; width: 80px; height: 80px; text-align: center; line-height: 1.1; font-size: 8pt; padding-top: 18px; margin-left: auto; }
-        .page-number { text-align: right; font-size: 7.5pt; color: #666; margin-top: 6px; }
-        .page-break { page-break-before: always; }
-    </style>
+    <title>{{ $document->official_number ?? 'INVOICE' }}</title>
+    @include('pdf.partials.wehdah-styles')
+    @if(($document->product_line ?? null) === 'scentury')
+        <style>
+            .wehdah-items th { background: #D4AF37 !important; color: #1a1a1a !important; }
+            .wehdah-grand-label, .wehdah-grand-val { background: #D4AF37 !important; color: #1a1a1a !important; }
+        </style>
+    @endif
 </head>
 <body>
-    @foreach($itemPages as $pageIndex => $pageItems)
-        @if($pageIndex > 0)<div class="page-break"></div>@endif
-        <div class="top-band"></div>
-        <div class="header">
-            <div class="logo-mark"><div class="logo-box">PG</div></div>
-            <div class="company">
-                <h1>{{ $company->name }}</h1>
-                <div class="details">
-                    {{ $company->registration_number }}<br>
-                    {{ $company->address }}
-                </div>
+@foreach($itemPages as $pageIndex => $pageItems)
+    @if($pageIndex > 0)<div class="page-break"></div>@endif
+
+    @if($pageIndex === 0)
+        @include('pdf.partials.pgg-gradient-header', ['documentTitle' => 'INVOICE'])
+        @include('pdf.partials.arabic-salutation', ['document' => $document])
+        <div class="wehdah-meta-row">
+            <div class="wehdah-meta-col wehdah-meta-col-left">
+                @include('pdf.partials.wehdah-customer', ['label' => 'Bill To:'])
             </div>
-            <div class="contact">
-                @if($company->phone) Tel: {{ $company->phone }}<br>@endif
-                @if($company->email) {{ $company->email }}<br>@endif
+            <div class="wehdah-meta-col wehdah-meta-col-right">
+                @include('pdf.partials.wehdah-meta', ['documentTitleEn' => 'INVOICE', 'showValidity' => false])
             </div>
         </div>
+    @else
+        @include('pdf.partials.wehdah-header', ['variant' => 'compact', 'documentTitle' => 'INVOICE'])
+    @endif
 
-        <div class="doc-title">INVOICE</div>
+    <table class="wehdah-items">
+        <thead>
+            <tr>
+                <th class="wehdah-items-num">Item</th>
+                <th class="wehdah-items-desc">Description</th>
+                <th class="r wehdah-items-qty">Qty</th>
+                <th class="wehdah-items-unit">Unit</th>
+                <th class="r wehdah-items-price">Unit Price</th>
+                <th class="r wehdah-items-discount">Discount</th>
+                <th class="r wehdah-items-total">Total Price</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($pageItems as $item)
+                @include('pdf.partials.section-header-row', ['item' => $item, 'columnCount' => 7])
+                @include('pdf.partials.wehdah-item-row', [
+                    'item' => $item,
+                    'index' => ($pageIndex * $itemsPerPage) + $loop->iteration,
+                    'columns' => 'full',
+                ])
+            @endforeach
+        </tbody>
+    </table>
 
-        @if($pageIndex === 0)
-            <div class="meta">
-                <div class="cell">
-                    <strong>Bill To</strong><br>
-                    {{ $customer->name ?? 'Walk-in Customer' }}<br>
-                    {{ $customer->address ?? '' }}
-                </div>
-                <div class="cell right">
-                    <strong>No:</strong> {{ $document->official_number ?? 'DRAFT' }}<br>
-                    <strong>Date:</strong> {{ optional($document->document_date)->format('d/m/Y') }}<br>
-                    <strong>Currency:</strong> {{ $document->currency }}
-                </div>
-            </div>
+    @if($pageIndex !== count($itemPages) - 1)
+        <div class="wehdah-continued">Continued on next page &rarr;</div>
+    @else
+        @if($amountWords)
+            <div class="wehdah-amount-words">{{ $amountWords }}</div>
         @endif
-
-        <table class="items">
-            <thead>
-                <tr>
-                    <th style="width: 7%">No</th>
-                    <th>Description</th>
-                    <th style="width: 10%" class="right">Qty</th>
-                    <th style="width: 14%" class="right">Rate</th>
-                    <th style="width: 15%" class="right">Amount</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($pageItems as $item)
-                    <tr>
-                        <td>{{ ($pageIndex * $itemsPerPage) + $loop->index + 1 }}</td>
-                        <td>{{ $item->description }}</td>
-                        <td class="right">{{ rtrim(rtrim(number_format((float) $item->quantity, 2), '0'), '.') }}</td>
-                        <td class="right">{{ number_format((float) $item->unit_price, 2) }}</td>
-                        <td class="right">{{ number_format((float) $item->line_total, 2) }}</td>
-                    </tr>
-                @endforeach
-            </tbody>
+        <table class="wehdah-totals">
+            @if((float) $document->subtotal !== (float) $document->grand_total)
+                <tr><td>Subtotal</td><td class="r">{{ number_format((float) $document->subtotal, 2) }}</td></tr>
+                @if((float) $document->discount_total > 0)
+                    <tr><td>Discount</td><td class="r">({{ number_format((float) $document->discount_total, 2) }})</td></tr>
+                @endif
+                @if((float) $document->tax_total > 0)
+                    <tr><td>Tax</td><td class="r">{{ number_format((float) $document->tax_total, 2) }}</td></tr>
+                @endif
+            @endif
+            <tr>
+                <td class="wehdah-grand-label">Grand Total ({{ $document->currency }})</td>
+                <td class="wehdah-grand-val">{{ number_format((float) $document->grand_total, 2) }}</td>
+            </tr>
         </table>
 
-        @if($pageIndex === count($itemPages) - 1)
-            <table class="totals">
-                <tr><td>Subtotal</td><td class="right">{{ number_format((float) $document->subtotal, 2) }}</td></tr>
-                @if((float) $document->discount_total > 0)<tr><td>Discount</td><td class="right">({{ number_format((float) $document->discount_total, 2) }})</td></tr>@endif
-                @if((float) $document->tax_total > 0)<tr><td>Tax</td><td class="right">{{ number_format((float) $document->tax_total, 2) }}</td></tr>@endif
-                <tr class="grand"><td>Grand Total ({{ $document->currency }})</td><td class="right">{{ number_format((float) $document->grand_total, 2) }}</td></tr>
-            </table>
-            @if($amountWords)<div class="amount-words">{{ $amountWords }}</div>@endif
-            <div class="signature">
-                <div class="cell">________________________<br>Customer</div>
-                <div class="cell right"><div class="stamp">{{ $company->name }}<br>CHOP</div></div>
-            </div>
+        @include('pdf.partials.wehdah-bank')
+
+        <div class="wehdah-terms">
+            All sponsorships and CSR contributions are subject to PIBG board approval.<br>
+            Tax-exemption receipt available upon request. Goods sold are not returnable and payment made is not refundable.
+        </div>
+
+        @if($document->terms)
+            <div class="wehdah-terms"><strong>Terms:</strong> {!! nl2br(e($document->terms)) !!}</div>
         @endif
 
-        <div class="page-number">Page {{ $pageIndex + 1 }} of {{ count($itemPages) }}</div>
-    @endforeach
-    @include('pdf.partials.artwork-pages')
+        @include('pdf.partials.wehdah-signature', [
+            'leftIntro' => 'Yours faithfully,',
+            'leftLabel' => 'For ' . ($company->name ?? ''),
+            'rightIntro' => 'Confirmed and accepted by,',
+            'rightLabel' => 'Sponsor / Donor Representative',
+        ])
+    @endif
+
+    <div class="wehdah-page-number">Page {{ $pageIndex + 1 }} of {{ count($itemPages) }}</div>
+@endforeach
+
+<div class="wehdah-footer-doc">
+    Computer-generated document &middot; {{ now()->setTimezone('Asia/Kuala_Lumpur')->format('d/m/Y h:i A') }} MYT
+</div>
+
+@include('pdf.partials.artwork-pages', ['documentTitleEn' => 'INVOICE', 'showConfirmation' => true])
 </body>
 </html>

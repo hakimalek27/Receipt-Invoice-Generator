@@ -1,12 +1,19 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 
 defineProps({
     currentCompany: Object,
     stats: Object,
     recentDocuments: Array,
+    allCompanyStats: { type: Array, default: () => [] },
 });
+
+function switchToCompany(companyId) {
+    router.post(route('active-company.switch'), { company_id: companyId }, {
+        preserveScroll: true,
+    });
+}
 </script>
 
 <template>
@@ -59,6 +66,31 @@ defineProps({
                     >
                         <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">{{ label }}</div>
                         <div class="mt-2 text-2xl font-semibold text-gray-900">{{ value }}</div>
+                    </div>
+                </div>
+
+                <div v-if="allCompanyStats.length > 0" class="mt-6 overflow-hidden bg-white shadow-sm sm:rounded-lg">
+                    <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+                        <h3 class="text-sm font-semibold text-gray-900">All Companies (super admin view)</h3>
+                    </div>
+                    <div class="divide-y divide-gray-100">
+                        <button
+                            v-for="company in allCompanyStats"
+                            :key="company.id"
+                            type="button"
+                            class="grid w-full grid-cols-[1fr_auto_auto_auto] items-baseline gap-4 px-6 py-3 text-left text-sm hover:bg-indigo-50"
+                            :class="{ 'bg-indigo-50/60': company.id === currentCompany?.id }"
+                            @click="switchToCompany(company.id)"
+                        >
+                            <div>
+                                <span class="font-mono text-xs text-gray-500">{{ company.code }}</span>
+                                <span class="ml-2 font-medium text-gray-900">{{ company.name }}</span>
+                                <span v-if="company.id === currentCompany?.id" class="ml-2 rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-800">ACTIVE</span>
+                            </div>
+                            <div class="text-xs text-gray-500"><span class="font-semibold text-gray-700">{{ company.documents }}</span> docs</div>
+                            <div class="text-xs text-amber-700">{{ company.drafts }} drafts</div>
+                            <div class="text-xs text-emerald-700">{{ company.issued }} issued</div>
+                        </button>
                     </div>
                 </div>
 

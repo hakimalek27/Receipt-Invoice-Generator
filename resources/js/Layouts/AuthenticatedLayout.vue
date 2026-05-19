@@ -1,13 +1,24 @@
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import ApplicationLogo from '@/Components/ApplicationLogo.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import NavLink from '@/Components/NavLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
-import { Link } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 
 const showingNavigationDropdown = ref(false);
+
+const page = usePage();
+const isSuperAdmin = computed(() => page.props?.auth?.user?.role === 'super_admin');
+const activeCompany = computed(() => page.props?.auth?.active_company || null);
+const availableCompanies = computed(() => page.props?.auth?.available_companies || []);
+
+function switchCompany(companyId) {
+    router.post(route('active-company.switch'), { company_id: companyId }, {
+        preserveScroll: true,
+    });
+}
 </script>
 
 <template>
@@ -61,6 +72,43 @@ const showingNavigationDropdown = ref(false);
                         </div>
 
                         <div class="hidden sm:ms-6 sm:flex sm:items-center">
+                            <!-- Company switcher (super admin) or read-only badge -->
+                            <div v-if="activeCompany" class="relative me-3">
+                                <Dropdown v-if="isSuperAdmin && availableCompanies.length > 1" align="right" width="56">
+                                    <template #trigger>
+                                        <button
+                                            type="button"
+                                            class="inline-flex items-center rounded-md border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-900 transition hover:bg-indigo-100 focus:outline-none"
+                                        >
+                                            <span class="me-1 text-[10px] uppercase tracking-wide text-indigo-500">Company</span>
+                                            {{ activeCompany.code }} &middot; {{ activeCompany.name }}
+                                            <svg class="-me-0.5 ms-2 h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                            </svg>
+                                        </button>
+                                    </template>
+                                    <template #content>
+                                        <div class="border-b border-gray-100 px-3 py-2 text-xs font-semibold text-gray-500">
+                                            Switch active company
+                                        </div>
+                                        <button
+                                            v-for="company in availableCompanies"
+                                            :key="company.id"
+                                            @click="switchCompany(company.id)"
+                                            class="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                                            :class="{ 'bg-indigo-50 font-semibold text-indigo-900': company.id === activeCompany.id }"
+                                        >
+                                            <div class="font-mono text-xs text-gray-500">{{ company.code }}</div>
+                                            <div>{{ company.name }}</div>
+                                        </button>
+                                    </template>
+                                </Dropdown>
+                                <span v-else class="inline-flex items-center rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-semibold text-gray-700">
+                                    <span class="me-1 text-[10px] uppercase tracking-wide text-gray-400">Company</span>
+                                    {{ activeCompany.code }} &middot; {{ activeCompany.name }}
+                                </span>
+                            </div>
+
                             <!-- Settings Dropdown -->
                             <div class="relative ms-3">
                                 <Dropdown align="right" width="48">

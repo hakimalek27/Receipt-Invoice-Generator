@@ -75,6 +75,8 @@ class DocumentWorkflowService
                 'fx_rate' => $fxRate,
                 'notes' => $data['notes'] ?? null,
                 'terms' => $data['terms'] ?? null,
+                'product_line' => $data['product_line'] ?? null,
+                'include_arabic_salutation' => $data['include_arabic_salutation'] ?? false,
                 'show_amount_in_words' => $data['show_amount_in_words'] ?? false,
                 'amount_in_words_locale' => $data['amount_in_words_locale'] ?? null,
                 'amount_in_words_currency' => $data['amount_in_words_currency'] ?? null,
@@ -165,7 +167,7 @@ class DocumentWorkflowService
                 'issue_timezone_snapshot' => 'Asia/Kuala_Lumpur',
                 'issuer_snapshot_json' => $company ? $this->companySnapshot($company) : null,
                 'buyer_snapshot_json' => $customer ? $this->customerSnapshot($customer) : null,
-                'bank_snapshot_json' => $company ? $company->only(['name', 'code']) : null,
+                'bank_snapshot_json' => $company ? $this->companyBankSnapshot($company) : null,
                 'terms_snapshot_json' => ['terms' => $document->terms],
                 'tax_snapshot_json' => ['tax_total' => $document->tax_total],
                 'currency_fx_snapshot_json' => ['currency' => $document->currency, 'fx_rate' => $document->fx_rate],
@@ -225,9 +227,12 @@ class DocumentWorkflowService
                 DocumentItem::create($this->itemPayload($target->id, [
                     'product_id' => $item->product_id,
                     'description' => $override['description'] ?? $item->description,
+                    'section_header' => $override['section_header'] ?? $item->section_header,
+                    'image_url' => $override['image_url'] ?? $item->image_url,
                     'quantity' => $override['quantity'] ?? $item->quantity,
                     'uom' => $override['uom'] ?? $item->uom,
                     'unit_price' => $override['unit_price'] ?? $item->unit_price,
+                    'cost_unit' => $override['cost_unit'] ?? $item->cost_unit,
                     'discount' => $override['discount'] ?? $item->discount,
                     'tax_type' => $override['tax_type'] ?? $item->tax_type,
                     'tax_rate' => $override['tax_rate'] ?? $item->tax_rate,
@@ -261,6 +266,73 @@ class DocumentWorkflowService
             ]);
 
             return $target;
+        });
+    }
+
+    /**
+     * Clone an existing document into a fresh independent draft.
+     * Preserves customer + items + flags; resets dates/status/number/snapshots;
+     * does NOT link as a conversion (converted_from_id stays null).
+     */
+    public function duplicate(int $sourceId, ?int $userId = null): Document
+    {
+        return DB::transaction(function () use ($sourceId, $userId) {
+            $source = Document::with('items')->findOrFail($sourceId);
+
+            $draft = Document::create([
+                'company_id' => $source->company_id,
+                'document_type' => $source->document_type,
+                'status' => Document::STATUS_DRAFT,
+                'customer_id' => $source->customer_id,
+                'document_date' => now()->toDateString(),
+                'due_date' => null,
+                'currency' => $source->currency,
+                'fx_rate' => $source->fx_rate,
+                'notes' => $source->notes,
+                'terms' => $source->terms,
+                'product_line' => $source->product_line,
+                'include_arabic_salutation' => (bool) $source->include_arabic_salutation,
+                'show_amount_in_words' => (bool) $source->show_amount_in_words,
+                'amount_in_words_locale' => $source->amount_in_words_locale,
+                'amount_in_words_currency' => $source->amount_in_words_currency,
+                'converted_from_id' => null,
+            ]);
+
+            foreach ($source->items as $i => $item) {
+                DocumentItem::create($this->itemPayload($draft->id, [
+                    'product_id' => $item->product_id,
+                    'description' => $item->description,
+                    'section_header' => $item->section_header,
+                    'image_url' => $item->image_url,
+                    'quantity' => $item->quantity,
+                    'uom' => $item->uom,
+                    'unit_price' => $item->unit_price,
+                    'cost_unit' => $item->cost_unit,
+                    'discount' => $item->discount,
+                    'tax_type' => $item->tax_type,
+                    'tax_rate' => $item->tax_rate,
+                    'tax_amount' => $item->tax_amount,
+                    'classification_code' => $item->classification_code,
+                    'tax_exemption_reason' => $item->tax_exemption_reason,
+                    'sort_order' => $i,
+                ], $i));
+            }
+
+            $draft->load('items');
+            $draft->recomputeTotals();
+            $draft->save();
+            $draft->draft_hash = $this->fingerprint->hash($draft);
+            $draft->save();
+
+            DocumentStatusHistory::create([
+                'document_id' => $draft->id,
+                'from_status' => null,
+                'to_status' => Document::STATUS_DRAFT,
+                'changed_by_user_id' => $userId,
+                'reason' => 'Duplicated from #'.$source->id,
+            ]);
+
+            return $draft;
         });
     }
 
@@ -429,6 +501,13 @@ class DocumentWorkflowService
             'sst_registration_number' => $company->sst_registration_number,
             'msic_code' => $company->msic_code,
             'business_activity_description' => $company->business_activity_description,
+            'logo_path' => $company->logo_path,
+            'stamp_path' => $company->stamp_path,
+            'signature_path' => $company->signature_path,
+            'brand_primary' => $company->brand_primary,
+            'brand_secondary' => $company->brand_secondary,
+            'brand_accent' => $company->brand_accent,
+            'pdf_boilerplate' => $company->pdf_boilerplate,
         ];
     }
 
@@ -459,6 +538,21 @@ class DocumentWorkflowService
         ];
     }
 
+    private function companyBankSnapshot(Company $company): array
+    {
+        return $company->bankAccounts()
+            ->where('is_active', true)
+            ->get()
+            ->map(fn ($bank) => [
+                'bank_name' => $bank->bank_name,
+                'account_number' => $bank->account_number,
+                'account_holder' => $bank->account_holder,
+                'swift_code' => $bank->swift_code,
+                'is_primary' => (bool) $bank->is_primary,
+            ])
+            ->all();
+    }
+
     private function canonicalAddress(array $parts): string
     {
         return collect($parts)
@@ -479,9 +573,31 @@ class DocumentWorkflowService
             }
 
             $firstDocument = $payment->allocations->first()?->document;
-            $description = 'Payment received';
-            if ($payment->reference_number) {
-                $description .= " ({$payment->reference_number})";
+
+            if ($payment->allocations->isNotEmpty()) {
+                $items = $payment->allocations->map(function ($allocation) use ($payment) {
+                    $sourceNumber = $allocation->document?->official_number ?? "DOC-{$allocation->document_id}";
+                    $description = "Payment for {$sourceNumber}";
+                    if ($payment->reference_number) {
+                        $description .= " (Ref: {$payment->reference_number})";
+                    }
+
+                    return [
+                        'description' => $description,
+                        'quantity' => 1,
+                        'unit_price' => (float) $allocation->amount,
+                    ];
+                })->all();
+            } else {
+                $description = 'Payment received';
+                if ($payment->reference_number) {
+                    $description .= " ({$payment->reference_number})";
+                }
+                $items = [[
+                    'description' => $description,
+                    'quantity' => 1,
+                    'unit_price' => (float) $payment->amount,
+                ]];
             }
 
             $receipt = $this->createDraft([
@@ -492,11 +608,10 @@ class DocumentWorkflowService
                 'currency' => $payment->currency,
                 'fx_rate' => $payment->fx_rate,
                 'notes' => $payment->notes,
-                'items' => [[
-                    'description' => $description,
-                    'quantity' => 1,
-                    'unit_price' => $payment->amount,
-                ]],
+                'show_amount_in_words' => true,
+                'amount_in_words_locale' => 'en_WEHDAH',
+                'amount_in_words_currency' => $payment->currency,
+                'items' => $items,
             ]);
 
             $issuedReceipt = $this->issue(
@@ -523,9 +638,12 @@ class DocumentWorkflowService
             'document_id' => $documentId,
             'product_id' => $itemData['product_id'] ?? null,
             'description' => $itemData['description'],
+            'section_header' => $itemData['section_header'] ?? null,
+            'image_url' => $itemData['image_url'] ?? null,
             'quantity' => $quantity,
             'uom' => $itemData['uom'] ?? 'unit',
             'unit_price' => $unitPrice,
+            'cost_unit' => isset($itemData['cost_unit']) ? (float) $itemData['cost_unit'] : null,
             'discount' => $discount,
             'line_total' => $lineTotal,
             'tax_type' => $itemData['tax_type'] ?? null,

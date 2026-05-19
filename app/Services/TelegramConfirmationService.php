@@ -115,6 +115,38 @@ class TelegramConfirmationService
         });
     }
 
+    public function consumeForReject(string $plainToken, string $chatId, ?string $telegramUserId): ?TelegramConfirmationToken
+    {
+        return DB::transaction(function () use ($plainToken, $chatId, $telegramUserId) {
+            $record = TelegramConfirmationToken::query()
+                ->where('token_hash', $this->hashToken($plainToken))
+                ->lockForUpdate()
+                ->first();
+
+            if (! $record || $record->used_at || now()->greaterThanOrEqualTo($record->expires_at)) {
+                return null;
+            }
+
+            if ($record->chat_id !== $chatId) {
+                return null;
+            }
+
+            if ($record->telegram_user_id && $telegramUserId && $record->telegram_user_id !== $telegramUserId) {
+                return null;
+            }
+
+            $document = Document::lockForUpdate()->find($record->document_id);
+            if (! $document || ! $document->isDraft()) {
+                return null;
+            }
+
+            $record->update(['used_at' => now()]);
+            $document->delete();
+
+            return $record->fresh(['document', 'user']);
+        });
+    }
+
     public function hashToken(string $token): string
     {
         return hash('sha256', $token);

@@ -46,10 +46,26 @@ class DatabaseSeeder extends Seeder
         $wehdah = Company::factory()->wehdah()->create();
         $nasCeria = Company::factory()->nasCeria()->create();
         $persada = Company::factory()->persada()->create();
+        $virtueDamsel = Company::factory()->virtueDamsel()->create();
 
         $this->seedPolicies($wehdah->id, 'WS');
         $this->seedPolicies($nasCeria->id, 'NCS');
         $this->seedPolicies($persada->id, 'PGG');
+        $this->seedPolicies($virtueDamsel->id, 'VD');
+
+        $wehdah->bankAccounts()->create([
+            'bank_name' => 'Hong Leong Islamic',
+            'account_number' => '18701038380',
+            'account_holder' => 'WEHDAH SOLUTION',
+            'is_primary' => true,
+            'sort_order' => 1,
+        ]);
+        $wehdah->bankAccounts()->create([
+            'bank_name' => 'Bank Islam',
+            'account_number' => '12113010769313',
+            'account_holder' => 'WEHDAH SOLUTION',
+            'sort_order' => 2,
+        ]);
 
         User::factory()->create([
             'name' => 'Super Admin', 'email' => 'super@example.com',
@@ -70,6 +86,10 @@ class DatabaseSeeder extends Seeder
         User::factory()->create([
             'name' => 'Persada Admin', 'email' => 'admin@persada.test',
             'role' => 'admin', 'company_id' => $persada->id,
+        ]);
+        User::factory()->create([
+            'name' => 'Virtue Damsel Admin', 'email' => 'admin@virtuedamsel.test',
+            'role' => 'admin', 'company_id' => $virtueDamsel->id,
         ]);
     }
 }

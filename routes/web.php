@@ -10,33 +10,78 @@ use App\Models\Product;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
+if (! function_exists('effective_company_id')) {
+    function effective_company_id(): ?int
+    {
+        return \App\Services\ActiveCompanyResolver::resolve(request()->user(), request());
+    }
+}
+
 Route::get('/', function () {
     return redirect()->route(request()->user() ? 'dashboard' : 'login');
 });
 
 Route::get('/dashboard', function () {
     $user = request()->user();
+    $companyId = effective_company_id();
+    $currentCompany = $companyId ? \App\Models\Company::find($companyId) : $user->company;
 
-    return Inertia::render('Dashboard', [
-        'currentCompany' => $user->company,
+    $payload = [
+        'currentCompany' => $currentCompany,
         'stats' => [
-            'documents' => Document::forCompany($user->company_id)->count(),
-            'drafts' => Document::forCompany($user->company_id)->draft()->count(),
-            'issued' => Document::forCompany($user->company_id)->issued()->count(),
-            'customers' => Customer::forCompany($user->company_id)->count(),
+            'documents' => Document::forCompany($companyId)->count(),
+            'drafts' => Document::forCompany($companyId)->draft()->count(),
+            'issued' => Document::forCompany($companyId)->issued()->count(),
+            'customers' => Customer::forCompany($companyId)->count(),
         ],
         'recentDocuments' => Document::with('customer')
-            ->forCompany($user->company_id)
+            ->forCompany($companyId)
             ->latest()
             ->limit(8)
             ->get(),
-    ]);
+    ];
+
+    if ($user->isSuperAdmin()) {
+        $payload['allCompanyStats'] = \App\Models\Company::where('is_active', true)
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($company) => [
+                'id' => $company->id,
+                'code' => $company->code,
+                'name' => $company->name,
+                'documents' => Document::forCompany($company->id)->count(),
+                'drafts' => Document::forCompany($company->id)->draft()->count(),
+                'issued' => Document::forCompany($company->id)->issued()->count(),
+            ]);
+    }
+
+    return Inertia::render('Dashboard', $payload);
 })->middleware(['auth', 'verified', 'company'])->name('dashboard');
+
+Route::middleware(['auth'])->post('/active-company', function () {
+    $user = request()->user();
+    if (! $user?->isSuperAdmin()) {
+        abort(403, 'Only super admins may switch active company.');
+    }
+    $data = request()->validate([
+        'company_id' => 'nullable|integer|exists:companies,id',
+    ]);
+    if (empty($data['company_id'])) {
+        session()->forget('active_company_id');
+    } else {
+        session()->put('active_company_id', (int) $data['company_id']);
+    }
+    return back();
+})->name('active-company.switch');
 
 Route::middleware(['auth', 'company'])->group(function () {
     Route::get('/documents', function () {
         $user = request()->user();
-        $query = Document::with('customer')->forCompany($user->company_id)->latest();
+        $query = Document::with([
+            'customer',
+            'convertedFrom:id,document_type,official_number,status',
+            'convertedTo:id,converted_from_id,document_type,official_number',
+        ])->forCompany(effective_company_id())->latest();
 
         foreach (['type' => 'document_type', 'status' => 'status'] as $param => $column) {
             if ($value = request()->query($param)) {
@@ -50,39 +95,63 @@ Route::middleware(['auth', 'company'])->group(function () {
                     ->orWhereHas('customer', fn ($customer) => $customer->where('name', 'like', "%{$search}%"));
             });
         }
+        if ($dateFrom = request()->query('date_from')) {
+            $query->whereDate('document_date', '>=', $dateFrom);
+        }
+        if ($dateTo = request()->query('date_to')) {
+            $query->whereDate('document_date', '<=', $dateTo);
+        }
 
         return Inertia::render('Documents/Index', [
             'documents' => $query->paginate(20)->withQueryString(),
-            'filters' => request()->only(['type', 'status', 'search']),
+            'filters' => request()->only(['type', 'status', 'search', 'date_from', 'date_to']),
             'documentTypes' => document_type_options(),
         ]);
     })->name('documents.index');
 
     Route::get('/documents/create', fn () => Inertia::render('Documents/Edit', [
         'document' => null,
-        'customers' => Customer::forCompany(request()->user()->company_id)->active()->orderBy('name')->get(),
-        'products' => Product::forCompany(request()->user()->company_id)->active()->orderBy('name')->get(),
+        'company' => \App\Models\Company::find(effective_company_id())?->only('id', 'code', 'name'),
+        'customers' => Customer::forCompany(effective_company_id())->active()->orderBy('name')->get(),
+        'products' => Product::forCompany(effective_company_id())->active()->orderBy('name')->get(),
         'documentTypes' => document_type_options(),
     ]))->name('documents.create');
 
     Route::get('/documents/{document}', function (Document $document) {
         abort_unless(
-            $document->company_id === request()->user()->company_id || request()->user()->isSuperAdmin(),
+            $document->company_id === effective_company_id() || request()->user()->isSuperAdmin(),
             403
         );
 
         return Inertia::render('Documents/Edit', [
-            'document' => $document->load('items', 'customer', 'attachments', 'pdfRenders'),
-            'customers' => Customer::forCompany(request()->user()->company_id)->active()->orderBy('name')->get(),
-            'products' => Product::forCompany(request()->user()->company_id)->active()->orderBy('name')->get(),
+            'document' => $document->load(
+                'items', 'customer', 'attachments', 'pdfRenders',
+                'convertedFrom:id,document_type,official_number,status',
+                'convertedTo:id,converted_from_id,document_type,official_number,status'
+            ),
+            'company' => \App\Models\Company::find($document->company_id)?->only('id', 'code', 'name'),
+            'customers' => Customer::forCompany(effective_company_id())->active()->orderBy('name')->get(),
+            'products' => Product::forCompany(effective_company_id())->active()->orderBy('name')->get(),
             'documentTypes' => document_type_options(),
+            'statusHistory' => $document->statusHistory()
+                ->with('changedBy:id,name')
+                ->orderBy('created_at')
+                ->get()
+                ->map(fn ($h) => [
+                    'id' => $h->id,
+                    'from_status' => $h->from_status,
+                    'to_status' => $h->to_status,
+                    'reason' => $h->reason,
+                    'changed_by' => $h->changedBy?->name,
+                    'created_at' => $h->created_at?->toIso8601String(),
+                ]),
         ]);
     })->name('documents.edit');
 
     Route::get('/payments', function () {
         $receivableDocuments = Document::with('customer')
             ->withSum('paymentAllocations as allocated_amount', 'amount')
-            ->forCompany(request()->user()->company_id)
+            ->forCompany(effective_company_id())
             ->issued()
             ->whereIn('document_type', ['invoice', 'cash_bill', 'debit_note'])
             ->latest()
@@ -98,21 +167,27 @@ Route::middleware(['auth', 'company'])->group(function () {
 
         return Inertia::render('Payments/Index', [
             'payments' => Payment::with('allocations.document', 'receiptDocument')
-                ->forCompany(request()->user()->company_id)
+                ->forCompany(effective_company_id())
                 ->latest()
                 ->paginate(30),
             'receivableDocuments' => $receivableDocuments,
         ]);
     })->name('payments.index');
 
-    Route::get('/master-data', fn () => Inertia::render('MasterData/Index', [
-        'company' => request()->user()->company,
-        'customers' => Customer::forCompany(request()->user()->company_id)->orderBy('name')->paginate(50),
-        'products' => Product::forCompany(request()->user()->company_id)->orderBy('name')->paginate(50),
-        'templates' => DocumentTemplate::forCompany(request()->user()->company_id)->orderBy('document_type')->get(),
-        'numberingPolicies' => NumberingPolicy::forCompany(request()->user()->company_id)->orderBy('document_type')->get(),
-        'documentTypes' => document_type_options(),
-    ]))->name('master-data.index');
+    Route::get('/master-data', function () {
+        $companyId = effective_company_id();
+        $company = $companyId ? \App\Models\Company::find($companyId) : null;
+
+        return Inertia::render('MasterData/Index', [
+            'company' => $company?->append(['logo_url', 'stamp_url', 'signature_url']),
+            'bankAccounts' => $company?->bankAccounts()->orderBy('sort_order')->get() ?? [],
+            'customers' => Customer::forCompany($companyId)->orderBy('name')->paginate(50),
+            'products' => Product::forCompany($companyId)->orderBy('name')->paginate(50),
+            'templates' => DocumentTemplate::forCompany($companyId)->orderBy('document_type')->get(),
+            'numberingPolicies' => NumberingPolicy::forCompany($companyId)->orderBy('document_type')->get(),
+            'documentTypes' => document_type_options(),
+        ]);
+    })->name('master-data.index');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
