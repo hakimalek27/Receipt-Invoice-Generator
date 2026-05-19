@@ -92,7 +92,7 @@ const error = ref('');
 const issueOpen = ref(false);
 const confirmedTotal = ref('');
 const lastPreviewHash = ref(null);
-const artworkFile = ref(null);
+const artworkFiles = ref([]);
 const artworkCaption = ref('');
 const availableConvertTargets = computed(() => CONVERSION_TARGETS[form.document_type] || []);
 const convertTarget = ref(availableConvertTargets.value[0] ?? 'invoice');
@@ -220,21 +220,38 @@ async function uploadArtwork() {
     if (!form.id) {
         await saveDraft();
     }
-    if (!form.id || !artworkFile.value) return;
+    if (!form.id || artworkFiles.value.length === 0) return;
     busy.value = true;
     error.value = '';
-    const body = new FormData();
-    body.append('file', artworkFile.value);
-    body.append('caption', artworkCaption.value || artworkFile.value.name);
-    body.append('include_in_pdf', '1');
+    const captionBase = artworkCaption.value.trim();
+    let uploaded = 0;
+    let failed = 0;
     try {
-        const attachment = await apiFetch(`/api/documents/${form.id}/attachments`, { method: 'POST', body });
-        form.attachments.push(attachment);
-        artworkFile.value = null;
+        for (let i = 0; i < artworkFiles.value.length; i++) {
+            const file = artworkFiles.value[i];
+            const body = new FormData();
+            body.append('file', file);
+            const cap = captionBase
+                ? (artworkFiles.value.length > 1 ? `${captionBase} #${i + 1}` : captionBase)
+                : file.name;
+            body.append('caption', cap);
+            body.append('include_in_pdf', '1');
+            try {
+                const attachment = await apiFetch(`/api/documents/${form.id}/attachments`, { method: 'POST', body });
+                form.attachments.push(attachment);
+                uploaded++;
+            } catch (innerException) {
+                failed++;
+                error.value = `${file.name}: ${innerException.message}`;
+            }
+        }
+        artworkFiles.value = [];
         artworkCaption.value = '';
-        message.value = 'Artwork uploaded.';
-    } catch (exception) {
-        error.value = exception.message;
+        if (failed === 0) {
+            message.value = `${uploaded} artwork uploaded.`;
+        } else {
+            message.value = `${uploaded} uploaded, ${failed} failed.`;
+        }
     } finally {
         busy.value = false;
     }
@@ -501,9 +518,9 @@ async function convertDocument() {
                             <span class="text-xs text-gray-500">Private storage · JPG/PNG/WEBP/PDF only</span>
                         </div>
                         <div class="mt-4 grid gap-3 md:grid-cols-[1fr_220px_auto]">
-                            <input type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" :disabled="!isDraft" class="rounded-md border border-gray-300 px-3 py-2 text-sm" @change="artworkFile = $event.target.files[0]">
-                            <input v-model="artworkCaption" :disabled="!isDraft" class="rounded-md border-gray-300 text-sm" placeholder="Caption">
-                            <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 disabled:opacity-50" :disabled="busy || !isDraft || !artworkFile" @click="uploadArtwork">Upload</button>
+                            <input type="file" multiple accept=".jpg,.jpeg,.png,.webp,.pdf" :disabled="!isDraft" class="rounded-md border border-gray-300 px-3 py-2 text-sm" @change="artworkFiles = Array.from($event.target.files)">
+                            <input v-model="artworkCaption" :disabled="!isDraft" class="rounded-md border-gray-300 text-sm" placeholder="Caption (prefix; #N appended for multi-upload)">
+                            <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 disabled:opacity-50" :disabled="busy || !isDraft || artworkFiles.length === 0" @click="uploadArtwork">Upload {{ artworkFiles.length > 1 ? `(${artworkFiles.length})` : '' }}</button>
                         </div>
                         <div class="mt-3 divide-y divide-gray-100 text-sm">
                             <div v-for="attachment in form.attachments" :key="attachment.id" class="flex items-center justify-between py-2">
