@@ -95,10 +95,16 @@ Route::middleware(['auth', 'company'])->group(function () {
                     ->orWhereHas('customer', fn ($customer) => $customer->where('name', 'like', "%{$search}%"));
             });
         }
+        if ($dateFrom = request()->query('date_from')) {
+            $query->whereDate('document_date', '>=', $dateFrom);
+        }
+        if ($dateTo = request()->query('date_to')) {
+            $query->whereDate('document_date', '<=', $dateTo);
+        }
 
         return Inertia::render('Documents/Index', [
             'documents' => $query->paginate(20)->withQueryString(),
-            'filters' => request()->only(['type', 'status', 'search']),
+            'filters' => request()->only(['type', 'status', 'search', 'date_from', 'date_to']),
             'documentTypes' => document_type_options(),
         ]);
     })->name('documents.index');

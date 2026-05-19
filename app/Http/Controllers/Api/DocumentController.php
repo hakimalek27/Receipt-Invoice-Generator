@@ -304,6 +304,19 @@ class DocumentController extends Controller
         ]);
     }
 
+    public function duplicate(Request $request, int $id): JsonResponse
+    {
+        $source = Document::findOrFail($id);
+        $companyId = \App\Services\ActiveCompanyResolver::resolve($request->user(), $request);
+        if ($source->company_id !== $companyId && ! $request->user()->isSuperAdmin()) {
+            return response()->json(['error' => 'Company scope violation'], 403);
+        }
+
+        $draft = $this->workflow->duplicate($id, $request->user()->id);
+
+        return response()->json($draft->load('items'), 201);
+    }
+
     public function convert(Request $request, int $id): JsonResponse
     {
         $document = Document::findOrFail($id);
@@ -336,9 +349,9 @@ class DocumentController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $companyId = \App\Services\ActiveCompanyResolver::resolve($request->user(), $request);
         $query = Document::with('items', 'customer')
-            ->forCompany($user->company_id)
+            ->forCompany($companyId)
             ->latest();
 
         if ($type = $request->query('type')) {

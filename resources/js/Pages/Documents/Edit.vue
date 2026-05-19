@@ -93,6 +93,7 @@ const error = ref('');
 const issueOpen = ref(false);
 const confirmedTotal = ref('');
 const lastPreviewHash = ref(null);
+const draggedAttachmentIndex = ref(null);
 const artworkFiles = ref([]);
 const artworkCaption = ref('');
 const availableConvertTargets = computed(() => CONVERSION_TARGETS[form.document_type] || []);
@@ -305,6 +306,50 @@ async function moveAttachment(index, direction) {
     }
 }
 
+function onAttachmentDragStart(index) {
+    draggedAttachmentIndex.value = index;
+}
+
+function onAttachmentDragEnd() {
+    draggedAttachmentIndex.value = null;
+}
+
+async function onAttachmentDrop(targetIndex) {
+    const fromIndex = draggedAttachmentIndex.value;
+    draggedAttachmentIndex.value = null;
+    if (fromIndex === null || fromIndex === targetIndex) return;
+    const reordered = [...form.attachments];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
+    const payload = reordered.map((a, i) => ({ id: a.id, sort_order: i + 1 }));
+    busy.value = true;
+    error.value = '';
+    try {
+        await apiFetch(`/api/documents/${form.id}/attachments/reorder`, {
+            method: 'PATCH',
+            body: JSON.stringify({ attachments: payload }),
+        });
+        form.attachments = reordered.map((a, i) => ({ ...a, sort_order: i + 1 }));
+    } catch (e) {
+        error.value = e.message;
+    } finally {
+        busy.value = false;
+    }
+}
+
+async function duplicateThisDocument() {
+    if (!form.id) return;
+    if (!confirm('Duplicate this document as a new draft?')) return;
+    busy.value = true;
+    try {
+        const fresh = await apiFetch(`/api/documents/${form.id}/duplicate`, { method: 'POST' });
+        window.location.href = `/documents/${fresh.id}`;
+    } catch (e) {
+        error.value = e.message;
+        busy.value = false;
+    }
+}
+
 function openIssue() {
     confirmedTotal.value = grandTotal.value.toFixed(2);
     issueOpen.value = true;
@@ -392,6 +437,7 @@ async function convertDocument() {
                     <Link :href="route('documents.index')" class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700">Back</Link>
                     <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" :disabled="busy || !form.id" @click="previewPdf('a4')">Preview A4</button>
                     <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" :disabled="busy || !form.id" @click="previewPdf('60mm')">60mm</button>
+                    <button v-if="form.id" class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" :disabled="busy" @click="duplicateThisDocument" title="Clone as new draft">Duplicate</button>
                     <button class="rounded-md bg-gray-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="busy || !isDraft" @click="saveDraft">Save Draft</button>
                     <button class="rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="busy || !isDraft || !form.id" @click="openIssue">Issue</button>
                 </div>
@@ -584,7 +630,18 @@ async function convertDocument() {
                             Selected: {{ artworkFiles.map((f) => `${f.name} (${(f.size / 1024 / 1024).toFixed(2)} MB)`).join(', ') }}
                         </div>
                         <div class="mt-3 divide-y divide-gray-100 text-sm">
-                            <div v-for="(attachment, index) in form.attachments" :key="attachment.id" class="flex items-center justify-between gap-3 py-2">
+                            <div v-for="(attachment, index) in form.attachments" :key="attachment.id"
+                                 class="flex items-center justify-between gap-3 py-2 transition"
+                                 :class="{
+                                     'cursor-move': isDraft,
+                                     'opacity-40': draggedAttachmentIndex === index,
+                                     'border-y-2 border-indigo-400 bg-indigo-50': draggedAttachmentIndex !== null && draggedAttachmentIndex !== index,
+                                 }"
+                                 :draggable="isDraft && !busy"
+                                 @dragstart="onAttachmentDragStart(index)"
+                                 @dragover.prevent
+                                 @drop.prevent="onAttachmentDrop(index)"
+                                 @dragend="onAttachmentDragEnd">
                                 <div class="flex flex-1 items-center gap-2 truncate">
                                     <span class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-600">{{ index + 1 }}</span>
                                     <span class="truncate">{{ attachment.caption || attachment.original_name }}</span>

@@ -298,6 +298,142 @@ async function createProduct() {
     });
 }
 
+const editingCustomerId = ref(null);
+const editingProductId = ref(null);
+const customerImport = reactive({ file: null, result: null, busy: false });
+const productImport = reactive({ file: null, result: null, busy: false });
+
+function openCustomerEdit(c) {
+    editingCustomerId.value = c.id;
+    Object.assign(customerForm, {
+        name: c.name ?? '',
+        attention_to: c.attention_to ?? '',
+        email: c.email ?? '',
+        phone: c.phone ?? '',
+        address: c.address ?? '',
+        postcode: c.postcode ?? '',
+        city: c.city ?? '',
+        state: c.state ?? '',
+        country: c.country ?? 'MY',
+        tax_identifier: c.tax_identifier ?? '',
+        brn_registration_number: c.brn_registration_number ?? '',
+        sst_registration_number: c.sst_registration_number ?? '',
+        msic_code: c.msic_code ?? '',
+    });
+}
+
+function cancelCustomerEdit() {
+    editingCustomerId.value = null;
+    reset(customerForm, {
+        name: '', attention_to: '', email: '', phone: '', address: '',
+        postcode: '', city: '', state: '', country: 'MY',
+        tax_identifier: '', brn_registration_number: '', sst_registration_number: '', msic_code: '',
+    });
+}
+
+async function saveCustomer() {
+    if (editingCustomerId.value) {
+        await run(async () => {
+            const updated = await apiFetch(`/api/customers/${editingCustomerId.value}`, {
+                method: 'PATCH',
+                body: customerForm,
+            });
+            const idx = customerRows.value.findIndex((c) => c.id === updated.id);
+            if (idx >= 0) customerRows.value[idx] = updated;
+            cancelCustomerEdit();
+            notice.value = 'Customer updated.';
+        });
+    } else {
+        await createCustomer();
+    }
+}
+
+async function deleteCustomer(c) {
+    if (!window.confirm(`Delete customer "${c.name}"?\n\nIssued documents that reference this customer keep their snapshot intact.`)) return;
+    await run(async () => {
+        await apiFetch(`/api/customers/${c.id}`, { method: 'DELETE' });
+        customerRows.value = customerRows.value.filter((x) => x.id !== c.id);
+        if (editingCustomerId.value === c.id) cancelCustomerEdit();
+        notice.value = 'Customer deleted.';
+    });
+}
+
+function openProductEdit(p) {
+    editingProductId.value = p.id;
+    Object.assign(productForm, {
+        name: p.name ?? '',
+        sku: p.sku ?? '',
+        description: p.description ?? '',
+        default_price: p.default_price ?? 0,
+        uom: p.uom ?? 'unit',
+        tax_type: p.tax_type ?? '',
+        tax_rate: p.tax_rate ?? 0,
+        classification_code: p.classification_code ?? '',
+    });
+}
+
+function cancelProductEdit() {
+    editingProductId.value = null;
+    reset(productForm, {
+        name: '', sku: '', description: '',
+        default_price: 0, uom: 'unit',
+        tax_type: '', tax_rate: 0, classification_code: '',
+    });
+}
+
+async function saveProduct() {
+    if (editingProductId.value) {
+        await run(async () => {
+            const updated = await apiFetch(`/api/products/${editingProductId.value}`, {
+                method: 'PATCH',
+                body: productForm,
+            });
+            const idx = productRows.value.findIndex((p) => p.id === updated.id);
+            if (idx >= 0) productRows.value[idx] = updated;
+            cancelProductEdit();
+            notice.value = 'Product updated.';
+        });
+    } else {
+        await createProduct();
+    }
+}
+
+async function deleteProduct(p) {
+    if (!window.confirm(`Delete product "${p.name}"?`)) return;
+    await run(async () => {
+        await apiFetch(`/api/products/${p.id}`, { method: 'DELETE' });
+        productRows.value = productRows.value.filter((x) => x.id !== p.id);
+        if (editingProductId.value === p.id) cancelProductEdit();
+        notice.value = 'Product deleted.';
+    });
+}
+
+async function importMasterData(kind) {
+    const slot = kind === 'customers' ? customerImport : productImport;
+    if (!slot.file) return;
+    slot.busy = true;
+    slot.result = null;
+    try {
+        const body = new FormData();
+        body.append('file', slot.file);
+        const result = await apiFetch(`/api/${kind}/import`, { method: 'POST', body });
+        slot.result = result;
+        slot.file = null;
+        // Reload list by re-requesting Inertia data
+        if (kind === 'customers') {
+            const fresh = await apiFetch('/api/customers');
+            customerRows.value = fresh.data || customerRows.value;
+        } else {
+            const fresh = await apiFetch('/api/products');
+            productRows.value = fresh.data || productRows.value;
+        }
+    } catch (e) {
+        slot.result = { error: e.message };
+    } finally {
+        slot.busy = false;
+    }
+}
+
 async function saveTemplate(row) {
     await run(async () => {
         const updated = await apiFetch(`/api/templates/${row.id}`, {
@@ -721,66 +857,144 @@ function reset(target, values) {
                 </section>
 
                 <section v-if="activeTab === 'customers'" class="mt-6 grid gap-6 lg:grid-cols-[420px_1fr]">
-                    <form class="bg-white p-6 shadow-sm sm:rounded-lg" @submit.prevent="createCustomer">
-                        <h3 class="text-sm font-semibold text-gray-900">New Customer</h3>
-                        <div class="mt-4 grid gap-3">
-                            <input v-model="customerForm.name" required placeholder="Customer name" class="rounded-md border-gray-300" />
-                            <input v-model="customerForm.attention_to" placeholder="Attention to" class="rounded-md border-gray-300" />
-                            <input v-model="customerForm.email" type="email" placeholder="Email" class="rounded-md border-gray-300" />
-                            <input v-model="customerForm.phone" placeholder="Phone" class="rounded-md border-gray-300" />
-                            <textarea v-model="customerForm.address" rows="3" placeholder="Address" class="rounded-md border-gray-300" />
-                            <div class="grid grid-cols-2 gap-3">
-                                <input v-model="customerForm.tax_identifier" placeholder="TIN" class="rounded-md border-gray-300" />
-                                <input v-model="customerForm.brn_registration_number" placeholder="BRN" class="rounded-md border-gray-300" />
+                    <div class="space-y-4">
+                        <form class="bg-white p-6 shadow-sm sm:rounded-lg" @submit.prevent="saveCustomer">
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-sm font-semibold text-gray-900">
+                                    {{ editingCustomerId ? `Editing customer #${editingCustomerId}` : 'New Customer' }}
+                                </h3>
+                                <button v-if="editingCustomerId" type="button" class="text-xs text-gray-500 hover:text-gray-900" @click="cancelCustomerEdit">Cancel</button>
+                            </div>
+                            <div class="mt-4 grid gap-3">
+                                <input v-model="customerForm.name" required placeholder="Customer name" class="rounded-md border-gray-300" />
+                                <input v-model="customerForm.attention_to" placeholder="Attention to" class="rounded-md border-gray-300" />
+                                <input v-model="customerForm.email" type="email" placeholder="Email" class="rounded-md border-gray-300" />
+                                <input v-model="customerForm.phone" placeholder="Phone" class="rounded-md border-gray-300" />
+                                <textarea v-model="customerForm.address" rows="3" placeholder="Address" class="rounded-md border-gray-300" />
+                                <div class="grid grid-cols-2 gap-3">
+                                    <input v-model="customerForm.tax_identifier" placeholder="TIN" class="rounded-md border-gray-300" />
+                                    <input v-model="customerForm.brn_registration_number" placeholder="BRN" class="rounded-md border-gray-300" />
+                                </div>
+                            </div>
+                            <button type="submit" class="mt-4 rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="busy">
+                                {{ editingCustomerId ? 'Update Customer' : 'Add Customer' }}
+                            </button>
+                        </form>
+
+                        <div class="bg-white p-4 shadow-sm sm:rounded-lg">
+                            <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-500">Import CSV</h4>
+                            <div class="mt-2 flex flex-col gap-2">
+                                <input type="file" accept=".csv,.txt" @change="customerImport.file = $event.target.files[0]" class="text-xs">
+                                <div class="flex items-center gap-2">
+                                    <button type="button" :disabled="!customerImport.file || customerImport.busy"
+                                            class="rounded-md bg-indigo-700 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
+                                            @click="importMasterData('customers')">
+                                        {{ customerImport.busy ? 'Uploading...' : 'Upload CSV' }}
+                                    </button>
+                                    <a href="/api/customers/import/template" class="text-xs text-indigo-700 hover:underline">Download template</a>
+                                </div>
+                                <div v-if="customerImport.result" class="rounded-md bg-gray-50 p-2 text-xs">
+                                    <div v-if="customerImport.result.error" class="text-red-700">{{ customerImport.result.error }}</div>
+                                    <template v-else>
+                                        <div class="font-semibold">{{ customerImport.result.inserted }} inserted, {{ customerImport.result.skipped }} skipped</div>
+                                        <div v-if="customerImport.result.errors?.length" class="mt-1 space-y-0.5 text-red-700">
+                                            <div v-for="(err, i) in customerImport.result.errors" :key="i">Row {{ err.row }}: {{ err.message }}</div>
+                                        </div>
+                                    </template>
+                                </div>
                             </div>
                         </div>
-                        <button type="submit" class="mt-4 rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="busy">
-                            Add Customer
-                        </button>
-                    </form>
+                    </div>
+
                     <div class="overflow-hidden bg-white shadow-sm sm:rounded-lg">
-                        <div class="border-b px-5 py-3 text-sm font-semibold text-gray-900">Customers</div>
+                        <div class="border-b px-5 py-3 text-sm font-semibold text-gray-900">Customers ({{ customerRows.length }})</div>
                         <div class="divide-y">
-                            <div v-for="customer in customerRows" :key="customer.id" class="grid gap-2 px-5 py-3 text-sm md:grid-cols-4">
-                                <div class="font-medium text-gray-900">{{ customer.name }}</div>
+                            <div v-for="customer in customerRows" :key="customer.id"
+                                 class="grid items-center gap-2 px-5 py-3 text-sm md:grid-cols-[1fr_120px_180px_160px_auto]"
+                                 :class="{ 'bg-indigo-50/60': editingCustomerId === customer.id }">
+                                <div class="font-medium text-gray-900 cursor-pointer hover:text-indigo-700" @click="openCustomerEdit(customer)">{{ customer.name }}</div>
                                 <div>{{ customer.phone || '-' }}</div>
-                                <div>{{ customer.email || '-' }}</div>
-                                <div class="text-gray-500">{{ customer.tax_identifier || customer.brn_registration_number || '-' }}</div>
+                                <div class="truncate">{{ customer.email || '-' }}</div>
+                                <div class="truncate text-gray-500">{{ customer.tax_identifier || customer.brn_registration_number || '-' }}</div>
+                                <div class="flex shrink-0 gap-1">
+                                    <button type="button" class="rounded border border-gray-300 px-2 py-1 text-xs" @click="openCustomerEdit(customer)">Edit</button>
+                                    <button type="button" class="rounded border border-red-300 bg-red-50 px-2 py-1 text-xs text-red-700" @click="deleteCustomer(customer)">Delete</button>
+                                </div>
                             </div>
+                            <div v-if="customerRows.length === 0" class="px-5 py-6 text-center text-sm text-gray-500">No customers yet.</div>
                         </div>
                     </div>
                 </section>
 
                 <section v-if="activeTab === 'products'" class="mt-6 grid gap-6 lg:grid-cols-[420px_1fr]">
-                    <form class="bg-white p-6 shadow-sm sm:rounded-lg" @submit.prevent="createProduct">
-                        <h3 class="text-sm font-semibold text-gray-900">New Product</h3>
-                        <div class="mt-4 grid gap-3">
-                            <input v-model="productForm.name" required placeholder="Product name" class="rounded-md border-gray-300" />
-                            <input v-model="productForm.sku" placeholder="SKU" class="rounded-md border-gray-300" />
-                            <textarea v-model="productForm.description" rows="3" placeholder="Description" class="rounded-md border-gray-300" />
-                            <div class="grid grid-cols-2 gap-3">
-                                <input v-model.number="productForm.default_price" type="number" step="0.01" min="0" placeholder="Default price" class="rounded-md border-gray-300" />
-                                <input v-model="productForm.uom" placeholder="UOM" class="rounded-md border-gray-300" />
+                    <div class="space-y-4">
+                        <form class="bg-white p-6 shadow-sm sm:rounded-lg" @submit.prevent="saveProduct">
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-sm font-semibold text-gray-900">
+                                    {{ editingProductId ? `Editing product #${editingProductId}` : 'New Product' }}
+                                </h3>
+                                <button v-if="editingProductId" type="button" class="text-xs text-gray-500 hover:text-gray-900" @click="cancelProductEdit">Cancel</button>
                             </div>
-                            <div class="grid grid-cols-2 gap-3">
-                                <input v-model="productForm.tax_type" placeholder="Tax type" class="rounded-md border-gray-300" />
-                                <input v-model.number="productForm.tax_rate" type="number" step="0.01" min="0" placeholder="Tax rate" class="rounded-md border-gray-300" />
+                            <div class="mt-4 grid gap-3">
+                                <input v-model="productForm.name" required placeholder="Product name" class="rounded-md border-gray-300" />
+                                <input v-model="productForm.sku" placeholder="SKU" class="rounded-md border-gray-300" />
+                                <textarea v-model="productForm.description" rows="3" placeholder="Description" class="rounded-md border-gray-300" />
+                                <div class="grid grid-cols-2 gap-3">
+                                    <input v-model.number="productForm.default_price" type="number" step="0.01" min="0" placeholder="Default price" class="rounded-md border-gray-300" />
+                                    <input v-model="productForm.uom" placeholder="UOM" class="rounded-md border-gray-300" />
+                                </div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <input v-model="productForm.tax_type" placeholder="Tax type" class="rounded-md border-gray-300" />
+                                    <input v-model.number="productForm.tax_rate" type="number" step="0.01" min="0" placeholder="Tax rate" class="rounded-md border-gray-300" />
+                                </div>
+                                <input v-model="productForm.classification_code" placeholder="Classification code" class="rounded-md border-gray-300" />
                             </div>
-                            <input v-model="productForm.classification_code" placeholder="Classification code" class="rounded-md border-gray-300" />
+                            <button type="submit" class="mt-4 rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="busy">
+                                {{ editingProductId ? 'Update Product' : 'Add Product' }}
+                            </button>
+                        </form>
+
+                        <div class="bg-white p-4 shadow-sm sm:rounded-lg">
+                            <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-500">Import CSV</h4>
+                            <div class="mt-2 flex flex-col gap-2">
+                                <input type="file" accept=".csv,.txt" @change="productImport.file = $event.target.files[0]" class="text-xs">
+                                <div class="flex items-center gap-2">
+                                    <button type="button" :disabled="!productImport.file || productImport.busy"
+                                            class="rounded-md bg-indigo-700 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
+                                            @click="importMasterData('products')">
+                                        {{ productImport.busy ? 'Uploading...' : 'Upload CSV' }}
+                                    </button>
+                                    <a href="/api/products/import/template" class="text-xs text-indigo-700 hover:underline">Download template</a>
+                                </div>
+                                <div v-if="productImport.result" class="rounded-md bg-gray-50 p-2 text-xs">
+                                    <div v-if="productImport.result.error" class="text-red-700">{{ productImport.result.error }}</div>
+                                    <template v-else>
+                                        <div class="font-semibold">{{ productImport.result.inserted }} inserted, {{ productImport.result.skipped }} skipped</div>
+                                        <div v-if="productImport.result.errors?.length" class="mt-1 space-y-0.5 text-red-700">
+                                            <div v-for="(err, i) in productImport.result.errors" :key="i">Row {{ err.row }}: {{ err.message }}</div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
                         </div>
-                        <button type="submit" class="mt-4 rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="busy">
-                            Add Product
-                        </button>
-                    </form>
+                    </div>
+
                     <div class="overflow-hidden bg-white shadow-sm sm:rounded-lg">
-                        <div class="border-b px-5 py-3 text-sm font-semibold text-gray-900">Products</div>
+                        <div class="border-b px-5 py-3 text-sm font-semibold text-gray-900">Products ({{ productRows.length }})</div>
                         <div class="divide-y">
-                            <div v-for="product in productRows" :key="product.id" class="grid gap-2 px-5 py-3 text-sm md:grid-cols-4">
-                                <div class="font-medium text-gray-900">{{ product.name }}</div>
-                                <div>{{ product.sku || '-' }}</div>
+                            <div v-for="product in productRows" :key="product.id"
+                                 class="grid items-center gap-2 px-5 py-3 text-sm md:grid-cols-[1fr_100px_80px_100px_auto]"
+                                 :class="{ 'bg-indigo-50/60': editingProductId === product.id }">
+                                <div class="font-medium text-gray-900 cursor-pointer hover:text-indigo-700" @click="openProductEdit(product)">{{ product.name }}</div>
+                                <div class="font-mono text-xs">{{ product.sku || '-' }}</div>
                                 <div>{{ product.uom || 'unit' }}</div>
-                                <div class="text-right">{{ Number(product.default_price || 0).toFixed(2) }}</div>
+                                <div class="text-right font-mono">{{ Number(product.default_price || 0).toFixed(2) }}</div>
+                                <div class="flex shrink-0 gap-1">
+                                    <button type="button" class="rounded border border-gray-300 px-2 py-1 text-xs" @click="openProductEdit(product)">Edit</button>
+                                    <button type="button" class="rounded border border-red-300 bg-red-50 px-2 py-1 text-xs text-red-700" @click="deleteProduct(product)">Delete</button>
+                                </div>
                             </div>
+                            <div v-if="productRows.length === 0" class="px-5 py-6 text-center text-sm text-gray-500">No products yet.</div>
                         </div>
                     </div>
                 </section>

@@ -103,6 +103,14 @@ class MasterDataController extends Controller
         return response()->json($customer->fresh());
     }
 
+    public function destroyCustomer(Request $request, int $customer): JsonResponse
+    {
+        $customer = Customer::forCompany(\App\Services\ActiveCompanyResolver::resolve($request->user(), $request))->findOrFail($customer);
+        $customer->delete();
+
+        return response()->json(['deleted' => true]);
+    }
+
     public function products(Request $request): JsonResponse
     {
         return response()->json(Product::forCompany(\App\Services\ActiveCompanyResolver::resolve($request->user(), $request))->orderBy('name')->paginate(50));
@@ -123,6 +131,14 @@ class MasterDataController extends Controller
         $product->update($this->productData($request, false));
 
         return response()->json($product->fresh());
+    }
+
+    public function destroyProduct(Request $request, int $product): JsonResponse
+    {
+        $product = Product::forCompany(\App\Services\ActiveCompanyResolver::resolve($request->user(), $request))->findOrFail($product);
+        $product->delete();
+
+        return response()->json(['deleted' => true]);
     }
 
     public function templates(Request $request): JsonResponse
@@ -194,9 +210,9 @@ class MasterDataController extends Controller
         return Company::findOrFail($companyId);
     }
 
-    private function customerData(Request $request, bool $creating = true): array
+    public static function customerRules(bool $creating = true): array
     {
-        return $request->validate([
+        return [
             'name' => [$creating ? 'required' : 'sometimes', 'string', 'max:255'],
             'attention_to' => 'nullable|string|max:255',
             'address' => 'nullable|string',
@@ -212,12 +228,17 @@ class MasterDataController extends Controller
             'sst_registration_number' => 'nullable|string|max:100',
             'msic_code' => 'nullable|string|max:10',
             'is_active' => 'nullable|boolean',
-        ]);
+        ];
     }
 
-    private function productData(Request $request, bool $creating = true): array
+    private function customerData(Request $request, bool $creating = true): array
     {
-        return $request->validate([
+        return $request->validate(self::customerRules($creating));
+    }
+
+    public static function productRules(bool $creating = true): array
+    {
+        return [
             'name' => [$creating ? 'required' : 'sometimes', 'string', 'max:255'],
             'description' => 'nullable|string',
             'sku' => 'nullable|string|max:100',
@@ -227,7 +248,12 @@ class MasterDataController extends Controller
             'tax_rate' => 'nullable|numeric|min:0',
             'classification_code' => 'nullable|string|max:50',
             'is_active' => 'nullable|boolean',
-        ]);
+        ];
+    }
+
+    private function productData(Request $request, bool $creating = true): array
+    {
+        return $request->validate(self::productRules($creating));
     }
 
     private function templateData(Request $request, bool $creating = true): array

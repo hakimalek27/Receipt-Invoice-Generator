@@ -270,6 +270,73 @@ class DocumentWorkflowService
     }
 
     /**
+     * Clone an existing document into a fresh independent draft.
+     * Preserves customer + items + flags; resets dates/status/number/snapshots;
+     * does NOT link as a conversion (converted_from_id stays null).
+     */
+    public function duplicate(int $sourceId, ?int $userId = null): Document
+    {
+        return DB::transaction(function () use ($sourceId, $userId) {
+            $source = Document::with('items')->findOrFail($sourceId);
+
+            $draft = Document::create([
+                'company_id' => $source->company_id,
+                'document_type' => $source->document_type,
+                'status' => Document::STATUS_DRAFT,
+                'customer_id' => $source->customer_id,
+                'document_date' => now()->toDateString(),
+                'due_date' => null,
+                'currency' => $source->currency,
+                'fx_rate' => $source->fx_rate,
+                'notes' => $source->notes,
+                'terms' => $source->terms,
+                'product_line' => $source->product_line,
+                'include_arabic_salutation' => (bool) $source->include_arabic_salutation,
+                'show_amount_in_words' => (bool) $source->show_amount_in_words,
+                'amount_in_words_locale' => $source->amount_in_words_locale,
+                'amount_in_words_currency' => $source->amount_in_words_currency,
+                'converted_from_id' => null,
+            ]);
+
+            foreach ($source->items as $i => $item) {
+                DocumentItem::create($this->itemPayload($draft->id, [
+                    'product_id' => $item->product_id,
+                    'description' => $item->description,
+                    'section_header' => $item->section_header,
+                    'image_url' => $item->image_url,
+                    'quantity' => $item->quantity,
+                    'uom' => $item->uom,
+                    'unit_price' => $item->unit_price,
+                    'cost_unit' => $item->cost_unit,
+                    'discount' => $item->discount,
+                    'tax_type' => $item->tax_type,
+                    'tax_rate' => $item->tax_rate,
+                    'tax_amount' => $item->tax_amount,
+                    'classification_code' => $item->classification_code,
+                    'tax_exemption_reason' => $item->tax_exemption_reason,
+                    'sort_order' => $i,
+                ], $i));
+            }
+
+            $draft->load('items');
+            $draft->recomputeTotals();
+            $draft->save();
+            $draft->draft_hash = $this->fingerprint->hash($draft);
+            $draft->save();
+
+            DocumentStatusHistory::create([
+                'document_id' => $draft->id,
+                'from_status' => null,
+                'to_status' => Document::STATUS_DRAFT,
+                'changed_by_user_id' => $userId,
+                'reason' => 'Duplicated from #'.$source->id,
+            ]);
+
+            return $draft;
+        });
+    }
+
+    /**
      * Void a document with reason.
      */
     public function void(int $documentId, string $reason, ?int $userId = null): Document
