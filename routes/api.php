@@ -26,6 +26,8 @@ Route::middleware(['auth:sanctum', 'company'])->group(function () {
     Route::post('/documents/{id}/issue', [DocumentController::class, 'issue']);
     Route::post('/documents/{id}/void', [DocumentController::class, 'void']);
     Route::post('/documents/{id}/convert', [DocumentController::class, 'convert']);
+    Route::delete('/documents/{id}', [DocumentController::class, 'destroy']);
+    Route::post('/documents/bulk-delete-drafts', [DocumentController::class, 'bulkDeleteDrafts']);
     Route::get('/documents/{id}/pdf', [PdfDownloadController::class, 'show']);
 
     Route::get('/documents/{document}/attachments', [DocumentAttachmentController::class, 'index']);
@@ -59,9 +61,11 @@ Route::middleware(['auth:sanctum', 'company'])->group(function () {
     Route::get('/templates', [MasterDataController::class, 'templates']);
     Route::post('/templates', [MasterDataController::class, 'storeTemplate']);
     Route::patch('/templates/{template}', [MasterDataController::class, 'updateTemplate']);
+    Route::delete('/templates/{template}', [MasterDataController::class, 'destroyTemplate']);
     Route::get('/numbering-policies', [MasterDataController::class, 'numberingPolicies']);
     Route::post('/numbering-policies', [MasterDataController::class, 'storeNumberingPolicy']);
     Route::patch('/numbering-policies/{policy}', [MasterDataController::class, 'updateNumberingPolicy']);
+    Route::delete('/numbering-policies/{policy}', [MasterDataController::class, 'destroyNumberingPolicy']);
 
     Route::post('/ai/deepseek/parse-draft', [AiDraftController::class, 'parse']);
 });

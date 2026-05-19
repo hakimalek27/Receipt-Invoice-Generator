@@ -147,6 +147,14 @@ class MasterDataController extends Controller
         return response()->json($template->fresh());
     }
 
+    public function destroyTemplate(Request $request, int $template): JsonResponse
+    {
+        $template = DocumentTemplate::forCompany(\App\Services\ActiveCompanyResolver::resolve($request->user(), $request))->findOrFail($template);
+        $template->delete();
+
+        return response()->json(['deleted' => true]);
+    }
+
     public function numberingPolicies(Request $request): JsonResponse
     {
         return response()->json(NumberingPolicy::forCompany(\App\Services\ActiveCompanyResolver::resolve($request->user(), $request))->orderBy('document_type')->get());
@@ -167,6 +175,14 @@ class MasterDataController extends Controller
         $policy->update($this->numberingData($request, false));
 
         return response()->json($policy->fresh());
+    }
+
+    public function destroyNumberingPolicy(Request $request, int $policy): JsonResponse
+    {
+        $policy = NumberingPolicy::forCompany(\App\Services\ActiveCompanyResolver::resolve($request->user(), $request))->findOrFail($policy);
+        $policy->delete();
+
+        return response()->json(['deleted' => true]);
     }
 
     private function scopedCompany(Request $request, int $companyId): Company

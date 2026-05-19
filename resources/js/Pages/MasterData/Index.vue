@@ -309,6 +309,15 @@ async function saveTemplate(row) {
     });
 }
 
+async function deleteTemplate(row) {
+    if (!window.confirm(`Delete template "${row.name}" (${row.document_type})?`)) return;
+    await run(async () => {
+        await apiFetch(`/api/templates/${row.id}`, { method: 'DELETE' });
+        templateRows.value = templateRows.value.filter((t) => t.id !== row.id);
+        notice.value = 'Template deleted.';
+    });
+}
+
 async function createTemplate() {
     await run(async () => {
         const template = await apiFetch('/api/templates', {
@@ -328,6 +337,15 @@ async function saveNumbering(row) {
         });
         Object.assign(row, updated);
         notice.value = 'Numbering policy saved.';
+    });
+}
+
+async function deleteNumbering(row) {
+    if (!window.confirm(`Delete numbering policy for ${row.document_type} (prefix ${row.prefix})? Existing documents keep their numbers, but new ones will fail until you re-create.`)) return;
+    await run(async () => {
+        await apiFetch(`/api/numbering-policies/${row.id}`, { method: 'DELETE' });
+        numberingRows.value = numberingRows.value.filter((n) => n.id !== row.id);
+        notice.value = 'Numbering policy deleted.';
     });
 }
 
@@ -816,6 +834,9 @@ function reset(target, values) {
                                 <button type="button" class="ml-auto rounded-md border border-gray-300 px-3 py-1.5 font-medium" :disabled="busy" @click="saveTemplate(template)">
                                     Save
                                 </button>
+                                <button type="button" class="rounded-md border border-red-300 bg-red-50 px-3 py-1.5 font-medium text-red-700" :disabled="busy" @click="deleteTemplate(template)">
+                                    Delete
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -861,6 +882,9 @@ function reset(target, values) {
                                 <span class="text-xs text-gray-500">Preview only; official number is issued-time only.</span>
                                 <button type="button" class="ml-auto rounded-md border border-gray-300 px-3 py-1.5 font-medium" :disabled="busy" @click="saveNumbering(policy)">
                                     Save
+                                </button>
+                                <button type="button" class="rounded-md border border-red-300 bg-red-50 px-3 py-1.5 font-medium text-red-700" :disabled="busy" @click="deleteNumbering(policy)">
+                                    Delete
                                 </button>
                             </div>
                         </div>

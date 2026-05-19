@@ -27,6 +27,8 @@ class DocumentAttachmentController extends Controller
             'file' => [
                 'required',
                 'file',
+                // 10240 KB = 10 MB. Must stay aligned with PHP-FPM upload_max_filesize
+                // (public/.user.ini) and nginx client_max_body_size (deploy/nginx).
                 'max:10240',
                 'mimes:jpg,jpeg,png,webp,pdf',
                 'mimetypes:image/jpeg,image/png,image/webp,application/pdf',

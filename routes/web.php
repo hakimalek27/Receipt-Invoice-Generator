@@ -23,21 +23,39 @@ Route::get('/', function () {
 
 Route::get('/dashboard', function () {
     $user = request()->user();
+    $companyId = effective_company_id();
+    $currentCompany = $companyId ? \App\Models\Company::find($companyId) : $user->company;
 
-    return Inertia::render('Dashboard', [
-        'currentCompany' => $user->company,
+    $payload = [
+        'currentCompany' => $currentCompany,
         'stats' => [
-            'documents' => Document::forCompany(effective_company_id())->count(),
-            'drafts' => Document::forCompany(effective_company_id())->draft()->count(),
-            'issued' => Document::forCompany(effective_company_id())->issued()->count(),
-            'customers' => Customer::forCompany(effective_company_id())->count(),
+            'documents' => Document::forCompany($companyId)->count(),
+            'drafts' => Document::forCompany($companyId)->draft()->count(),
+            'issued' => Document::forCompany($companyId)->issued()->count(),
+            'customers' => Customer::forCompany($companyId)->count(),
         ],
         'recentDocuments' => Document::with('customer')
-            ->forCompany(effective_company_id())
+            ->forCompany($companyId)
             ->latest()
             ->limit(8)
             ->get(),
-    ]);
+    ];
+
+    if ($user->isSuperAdmin()) {
+        $payload['allCompanyStats'] = \App\Models\Company::where('is_active', true)
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($company) => [
+                'id' => $company->id,
+                'code' => $company->code,
+                'name' => $company->name,
+                'documents' => Document::forCompany($company->id)->count(),
+                'drafts' => Document::forCompany($company->id)->draft()->count(),
+                'issued' => Document::forCompany($company->id)->issued()->count(),
+            ]);
+    }
+
+    return Inertia::render('Dashboard', $payload);
 })->middleware(['auth', 'verified', 'company'])->name('dashboard');
 
 Route::middleware(['auth'])->post('/active-company', function () {
@@ -109,6 +127,18 @@ Route::middleware(['auth', 'company'])->group(function () {
             'customers' => Customer::forCompany(effective_company_id())->active()->orderBy('name')->get(),
             'products' => Product::forCompany(effective_company_id())->active()->orderBy('name')->get(),
             'documentTypes' => document_type_options(),
+            'statusHistory' => $document->statusHistory()
+                ->with('changedBy:id,name')
+                ->orderBy('created_at')
+                ->get()
+                ->map(fn ($h) => [
+                    'id' => $h->id,
+                    'from_status' => $h->from_status,
+                    'to_status' => $h->to_status,
+                    'reason' => $h->reason,
+                    'changed_by' => $h->changedBy?->name,
+                    'created_at' => $h->created_at?->toIso8601String(),
+                ]),
         ]);
     })->name('documents.edit');
 

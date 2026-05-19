@@ -10,6 +10,7 @@ const props = defineProps({
     customers: Array,
     products: Array,
     documentTypes: Array,
+    statusHistory: { type: Array, default: () => [] },
 });
 
 const page = usePage();
@@ -216,7 +217,7 @@ async function previewPdf(paper = 'a4') {
     window.open(`/api/documents/${form.id}/pdf?paper=${paper}`, '_blank');
 }
 
-const UPLOAD_MAX_BYTES = 2 * 1024 * 1024; // PHP upload_max_filesize default (2 MB)
+const UPLOAD_MAX_BYTES = 10 * 1024 * 1024; // Aligned with PHP-FPM + nginx (10 MB)
 
 async function uploadArtwork() {
     if (!form.id) {
@@ -227,7 +228,7 @@ async function uploadArtwork() {
     const tooBig = artworkFiles.value.filter((f) => f.size > UPLOAD_MAX_BYTES);
     if (tooBig.length > 0) {
         const names = tooBig.map((f) => `${f.name} (${(f.size / 1024 / 1024).toFixed(2)} MB)`).join(', ');
-        error.value = `These files exceed the 2 MB server upload limit: ${names}. Please compress or split the files.`;
+        error.value = `These files exceed the 10 MB server upload limit: ${names}. Please compress or split the files.`;
         return;
     }
 
@@ -349,6 +350,16 @@ async function voidDocument() {
     } finally {
         busy.value = false;
     }
+}
+
+function statusColor(status) {
+    return {
+        draft: 'text-amber-700',
+        issued: 'text-emerald-700',
+        converted: 'text-indigo-700',
+        void: 'text-red-700',
+        cancelled: 'text-gray-600',
+    }[status] || 'text-gray-700';
 }
 
 async function convertDocument() {
@@ -562,7 +573,7 @@ async function convertDocument() {
                     <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
                         <div class="flex items-center justify-between">
                             <h3 class="text-sm font-semibold text-gray-900">Artwork Attachments</h3>
-                            <span class="text-xs text-gray-500">JPG/PNG/WEBP/PDF · max 2 MB per file</span>
+                            <span class="text-xs text-gray-500">JPG/PNG/WEBP/PDF · max 10 MB per file</span>
                         </div>
                         <div class="mt-4 grid gap-3 md:grid-cols-[1fr_220px_auto]">
                             <input type="file" multiple accept=".jpg,.jpeg,.png,.webp,.pdf" :disabled="!isDraft" class="rounded-md border border-gray-300 px-3 py-2 text-sm" @change="artworkFiles = Array.from($event.target.files)">
@@ -633,6 +644,24 @@ async function convertDocument() {
                             <textarea v-model="voidReason" rows="2" class="w-full rounded-md border-gray-300 text-sm" placeholder="Void reason"></textarea>
                             <button class="w-full rounded-md bg-red-700 px-3 py-2 text-sm font-semibold text-white" @click="voidDocument">Void</button>
                         </div>
+                    </div>
+
+                    <div v-if="form.id && statusHistory.length > 0" class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+                        <h3 class="text-sm font-semibold text-gray-900">Status Timeline</h3>
+                        <ol class="mt-3 space-y-3 text-xs">
+                            <li v-for="event in statusHistory" :key="event.id" class="border-l-2 border-gray-200 pl-3">
+                                <div class="flex items-baseline justify-between">
+                                    <span class="font-mono font-semibold" :class="statusColor(event.to_status)">
+                                        {{ event.from_status ? `${event.from_status} → ${event.to_status}` : event.to_status }}
+                                    </span>
+                                    <span class="text-gray-400">{{ event.created_at?.slice(0, 16).replace('T', ' ') }}</span>
+                                </div>
+                                <div v-if="event.changed_by" class="mt-0.5 text-gray-600">by {{ event.changed_by }}</div>
+                                <div v-if="event.reason" class="mt-1 rounded bg-red-50 px-2 py-1 text-red-700">
+                                    <span class="font-semibold">Reason:</span> {{ event.reason }}
+                                </div>
+                            </li>
+                        </ol>
                     </div>
                 </aside>
             </div>

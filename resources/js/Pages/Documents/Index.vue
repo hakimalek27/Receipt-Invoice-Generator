@@ -1,8 +1,8 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { money } from '@/lib/api';
+import { apiFetch, money } from '@/lib/api';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { reactive } from 'vue';
+import { computed, reactive, ref } from 'vue';
 
 const props = defineProps({
     documents: Object,
@@ -15,6 +15,46 @@ const filter = reactive({
     status: props.filters?.status ?? '',
     search: props.filters?.search ?? '',
 });
+
+const selectedIds = ref(new Set());
+const busy = ref(false);
+const message = ref('');
+
+const draftRows = computed(() => props.documents?.data?.filter((d) => d.status === 'draft') || []);
+
+function toggleSelect(id) {
+    selectedIds.value.has(id) ? selectedIds.value.delete(id) : selectedIds.value.add(id);
+    selectedIds.value = new Set(selectedIds.value);
+}
+
+function selectAllDrafts() {
+    if (draftRows.value.every((d) => selectedIds.value.has(d.id))) {
+        draftRows.value.forEach((d) => selectedIds.value.delete(d.id));
+    } else {
+        draftRows.value.forEach((d) => selectedIds.value.add(d.id));
+    }
+    selectedIds.value = new Set(selectedIds.value);
+}
+
+async function bulkDelete() {
+    const ids = Array.from(selectedIds.value);
+    if (ids.length === 0) return;
+    if (!window.confirm(`Permanently delete ${ids.length} draft document(s)? This cannot be undone.`)) return;
+    busy.value = true;
+    try {
+        const result = await apiFetch('/api/documents/bulk-delete-drafts', {
+            method: 'POST',
+            body: JSON.stringify({ ids }),
+        });
+        selectedIds.value = new Set();
+        message.value = `Deleted ${result.deleted_count} draft(s).`;
+        router.reload({ only: ['documents'] });
+    } catch (e) {
+        alert(e.message);
+    } finally {
+        busy.value = false;
+    }
+}
 
 function applyFilters() {
     router.get(route('documents.index'), filter, {
@@ -84,10 +124,27 @@ function chainTooltip(document) {
                     </div>
                 </div>
 
+                <div v-if="selectedIds.size > 0" class="flex items-center justify-between rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm text-indigo-900">
+                    <span>{{ selectedIds.size }} draft(s) selected</span>
+                    <div class="flex gap-2">
+                        <button @click="selectedIds = new Set()" class="rounded-md border border-indigo-300 bg-white px-3 py-1 text-xs">Clear</button>
+                        <button :disabled="busy" @click="bulkDelete" class="rounded-md bg-red-700 px-3 py-1 text-xs font-semibold text-white">Delete selected</button>
+                    </div>
+                </div>
+                <div v-if="message" class="rounded border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800">{{ message }}</div>
+
                 <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                             <tr>
+                                <th class="px-2 py-3">
+                                    <input type="checkbox"
+                                           :disabled="draftRows.length === 0"
+                                           :checked="draftRows.length > 0 && draftRows.every((d) => selectedIds.has(d.id))"
+                                           @change="selectAllDrafts"
+                                           title="Select all drafts on this page"
+                                           class="rounded border-gray-300">
+                                </th>
                                 <th class="px-4 py-3">Type</th>
                                 <th class="px-4 py-3">Number</th>
                                 <th class="px-4 py-3">Customer</th>
@@ -98,7 +155,14 @@ function chainTooltip(document) {
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
-                            <tr v-for="document in documents.data" :key="document.id" class="hover:bg-gray-50">
+                            <tr v-for="document in documents.data" :key="document.id" class="hover:bg-gray-50" :class="{ 'bg-indigo-50/40': selectedIds.has(document.id) }">
+                                <td class="px-2 py-3">
+                                    <input v-if="document.status === 'draft'"
+                                           type="checkbox"
+                                           :checked="selectedIds.has(document.id)"
+                                           @change="toggleSelect(document.id)"
+                                           class="rounded border-gray-300">
+                                </td>
                                 <td class="px-4 py-3 font-medium">
                                     {{ document.document_type }}
                                     <span v-if="document.converted_from || document.converted_to?.length"
@@ -117,7 +181,7 @@ function chainTooltip(document) {
                                 </td>
                             </tr>
                             <tr v-if="documents.data.length === 0">
-                                <td colspan="7" class="px-4 py-10 text-center text-gray-500">No documents found.</td>
+                                <td colspan="8" class="px-4 py-10 text-center text-gray-500">No documents found.</td>
                             </tr>
                         </tbody>
                     </table>

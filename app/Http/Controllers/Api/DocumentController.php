@@ -264,6 +264,46 @@ class DocumentController extends Controller
         }
     }
 
+    public function destroy(Request $request, int $id): JsonResponse
+    {
+        $document = Document::findOrFail($id);
+        $companyId = \App\Services\ActiveCompanyResolver::resolve($request->user(), $request);
+        if ($document->company_id !== $companyId && ! $request->user()->isSuperAdmin()) {
+            return response()->json(['error' => 'Company scope violation'], 403);
+        }
+        if (! $document->isDraft()) {
+            return response()->json(['error' => 'Only draft documents may be deleted; use void for issued documents.'], 422);
+        }
+        $document->delete();
+
+        return response()->json(['deleted' => true]);
+    }
+
+    public function bulkDeleteDrafts(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'ids' => 'required|array|min:1|max:100',
+            'ids.*' => 'integer',
+        ]);
+
+        $companyId = \App\Services\ActiveCompanyResolver::resolve($request->user(), $request);
+        $query = Document::query()
+            ->whereIn('id', $data['ids'])
+            ->where('status', Document::STATUS_DRAFT);
+
+        if (! $request->user()->isSuperAdmin()) {
+            $query->where('company_id', $companyId);
+        }
+
+        $deleted = $query->get();
+        Document::whereIn('id', $deleted->pluck('id'))->delete();
+
+        return response()->json([
+            'deleted_count' => $deleted->count(),
+            'deleted_ids' => $deleted->pluck('id'),
+        ]);
+    }
+
     public function convert(Request $request, int $id): JsonResponse
     {
         $document = Document::findOrFail($id);
