@@ -26,6 +26,20 @@ class ActiveCompanyResolver
             if ($override) {
                 return (int) $override;
             }
+
+            // Super admin has no override yet (e.g. first request after login,
+            // or session was cleared). Auto-pick the first active company so
+            // every controller that scopes by company keeps working, and
+            // persist to the session so the UI switcher stays in sync.
+            $firstId = \App\Models\Company::where('is_active', true)
+                ->orderBy('id')
+                ->value('id');
+
+            if ($firstId && $session) {
+                $session->put('active_company_id', (int) $firstId);
+            }
+
+            return $firstId ? (int) $firstId : $user->company_id;
         }
 
         return $user->company_id;
