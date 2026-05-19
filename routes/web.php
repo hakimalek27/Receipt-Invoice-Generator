@@ -10,13 +10,6 @@ use App\Models\Product;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-if (! function_exists('effective_company_id')) {
-    function effective_company_id(): ?int
-    {
-        return \App\Services\ActiveCompanyResolver::resolve(request()->user(), request());
-    }
-}
-
 Route::get('/', function () {
     return redirect()->route(request()->user() ? 'dashboard' : 'login');
 });
@@ -195,21 +188,3 @@ Route::middleware(['auth', 'company'])->group(function () {
 });
 
 require __DIR__.'/auth.php';
-
-if (! function_exists('document_type_options')) {
-    function document_type_options(): array
-    {
-        return [
-            'invoice',
-            'quotation',
-            'official_receipt',
-            'delivery_order',
-            'cash_bill',
-            'credit_note',
-            'debit_note',
-            'purchase_order',
-            'payment_voucher',
-            'proforma_invoice',
-        ];
-    }
-}
