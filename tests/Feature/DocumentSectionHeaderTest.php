@@ -43,7 +43,6 @@ class DocumentSectionHeaderTest extends TestCase
 
             $html = view($template, $service->renderData($document))->render();
 
-            $this->assertStringContainsString('section-header-row', $html, "{$code}: section-header-row class missing");
             $this->assertStringContainsString('Bilik Muaazzin', $html, "{$code}: section header text missing");
             $this->assertStringContainsString('colspan="7"', $html, "{$code}: section row not full-span");
         }
@@ -65,6 +64,7 @@ class DocumentSectionHeaderTest extends TestCase
 
         $html = view('pdf.wehdah.invoice', $service->renderData($document))->render();
 
-        $this->assertStringNotContainsString('section-header-row', $html);
+        $this->assertStringNotContainsString('Bilik Muaazzin', $html);
+        $this->assertStringNotContainsString('colspan="7"', $html);
     }
 }

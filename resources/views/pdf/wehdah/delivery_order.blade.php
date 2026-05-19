@@ -3,39 +3,39 @@
 <head>
     <meta charset="utf-8">
     <title>{{ $document->official_number ?? 'DELIVERY ORDER' }}</title>
-    @include('pdf.partials.wehdah-styles')
+    @include('pdf.wehdah._styles')
 </head>
 <body>
 @foreach($itemPages as $pageIndex => $pageItems)
     @if($pageIndex > 0)<div class="page-break"></div>@endif
 
     @if($pageIndex === 0)
-        @include('pdf.partials.wehdah-header', ['variant' => 'full', 'documentTitle' => 'DELIVERY ORDER'])
-        <div class="wehdah-meta-row">
-            <div class="wehdah-meta-col wehdah-meta-col-left">
-                @include('pdf.partials.wehdah-customer', ['label' => 'Deliver To:'])
+        @include('pdf.wehdah._header', ['variant' => 'full', 'documentTitle' => 'DELIVERY ORDER'])
+        <div class="ws-meta-row">
+            <div class="ws-meta-col ws-meta-col-left">
+                @include('pdf.wehdah._bill-to', ['label' => 'Deliver To:'])
             </div>
-            <div class="wehdah-meta-col wehdah-meta-col-right">
-                @include('pdf.partials.wehdah-meta', ['documentTitleEn' => 'DELIVERY ORDER', 'showValidity' => false])
+            <div class="ws-meta-col ws-meta-col-right">
+                @include('pdf.wehdah._meta-block', ['documentTitleEn' => 'DELIVERY ORDER', 'showValidity' => false])
             </div>
         </div>
     @else
-        @include('pdf.partials.wehdah-header', ['variant' => 'compact', 'documentTitle' => 'DELIVERY ORDER'])
+        @include('pdf.wehdah._header', ['variant' => 'compact', 'documentTitle' => 'DELIVERY ORDER'])
     @endif
 
-    <table class="wehdah-items">
+    <table class="ws-items">
         <thead>
             <tr>
-                <th class="wehdah-items-num">No</th>
-                <th class="wehdah-items-desc">Description</th>
-                <th class="r wehdah-items-qty">Qty</th>
-                <th class="wehdah-items-unit">Unit</th>
+                <th class="ws-col-item">No</th>
+                <th class="ws-col-desc">Description</th>
+                <th class="ws-col-qty">Qty</th>
+                <th class="ws-col-unit">Unit</th>
             </tr>
         </thead>
         <tbody>
             @foreach($pageItems as $item)
-                @include('pdf.partials.section-header-row', ['item' => $item, 'columnCount' => 4])
-                @include('pdf.partials.wehdah-item-row', [
+                @include('pdf.wehdah._section-header', ['item' => $item, 'columnCount' => 4])
+                @include('pdf.wehdah._item-row', [
                     'item' => $item,
                     'index' => ($pageIndex * $itemsPerPage) + $loop->iteration,
                     'columns' => 'do',
@@ -45,27 +45,27 @@
     </table>
 
     @if($pageIndex !== count($itemPages) - 1)
-        <div class="wehdah-continued">Continued on next page &rarr;</div>
+        <div class="ws-continued">Continued on next page &rarr;</div>
     @else
         @if($document->notes)
-            <div class="wehdah-terms"><strong>Notes:</strong> {!! nl2br(e($document->notes)) !!}</div>
+            <div class="ws-terms"><strong>Notes:</strong> {!! nl2br(e($document->notes)) !!}</div>
         @endif
         @if($document->terms)
-            <div class="wehdah-terms"><strong>Terms:</strong> {!! nl2br(e($document->terms)) !!}</div>
+            <div class="ws-terms"><strong>Terms:</strong> {!! nl2br(e($document->terms)) !!}</div>
         @endif
 
-        @include('pdf.partials.wehdah-signature', [
+        @include('pdf.wehdah._signature', [
             'leftIntro' => 'Delivered by,',
             'leftLabel' => 'Authorised Signature',
-            'rightIntro' => 'Goods received in good condition',
+            'rightIntro' => 'Goods received in right and good condition',
             'rightLabel' => 'Customer Sign & Chop',
         ])
     @endif
 
-    <div class="wehdah-page-number">Page {{ $pageIndex + 1 }} of {{ count($itemPages) }}</div>
+    <div class="ws-page-number">Page {{ $pageIndex + 1 }} of {{ count($itemPages) }}</div>
 @endforeach
 
-<div class="wehdah-footer-doc">
+<div class="ws-footer-doc">
     Computer-generated document &middot; {{ now()->setTimezone('Asia/Kuala_Lumpur')->format('d/m/Y h:i A') }} MYT
 </div>
 

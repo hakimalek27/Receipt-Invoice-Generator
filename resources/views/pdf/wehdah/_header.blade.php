@@ -1,0 +1,58 @@
+@php
+    $variant = $variant ?? 'full';
+    $documentTitle = $documentTitle ?? strtoupper(str_replace('_', ' ', $document->document_type));
+    $regionLine = trim(implode(' ', array_filter([
+        $company->postcode ?? null,
+        $company->city ?? null,
+        $company->state ?? null,
+        $company->country ?? null,
+    ])));
+    $countryName = match (strtoupper((string) ($company->country ?? ''))) {
+        'MY' => 'Malaysia',
+        'SG' => 'Singapore',
+        default => $company->country ?? null,
+    };
+    $regionLineExpanded = trim(implode(' ', array_filter([
+        $company->postcode ?? null,
+        $company->city ?? null,
+        $company->state ?? null,
+        $countryName,
+    ]))).'.';
+@endphp
+
+@if($variant === 'compact')
+    <div class="ws-header-compact">
+        <div class="ws-header-compact-name">{{ $company->name ?? '' }}</div>
+        <div class="ws-header-compact-center">{{ strtoupper($documentTitle) }} &ndash; CONTINUED</div>
+        <div class="ws-header-compact-right">
+            No: {{ $document->official_number ?? 'DRAFT' }}
+            @if(!empty($customer?->name)) &middot; {{ \Illuminate\Support\Str::limit($customer->name, 28) }} @endif
+        </div>
+    </div>
+@else
+    <div class="ws-title-strip">
+        <span class="ws-title-strip-text">{{ strtoupper($documentTitle) }}</span>
+    </div>
+    <div class="ws-company-block">
+        <div class="ws-company-name">
+            {{ strtoupper($company->name ?? '') }}
+            @if(!empty($company->registration_number))
+                <span class="ws-company-reg">{{ $company->registration_number }}</span>
+            @endif
+        </div>
+        @if(!empty($company->address))
+            <div class="ws-company-address">{{ $company->address }}</div>
+        @endif
+        @if(!empty($company->address_line_2))
+            <div class="ws-company-address">{{ $company->address_line_2 }}</div>
+        @endif
+        @if($regionLineExpanded !== '.')
+            <div class="ws-company-address">{{ $regionLineExpanded }}</div>
+        @endif
+        <div class="ws-company-contact">
+            @if(!empty($company->phone))Phone: {{ $company->phone }}@endif
+            @if(!empty($company->phone) && !empty($company->email)) &nbsp; @endif
+            @if(!empty($company->email))Email: {{ $company->email }}@endif
+        </div>
+    </div>
+@endif
