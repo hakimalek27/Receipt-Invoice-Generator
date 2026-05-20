@@ -45,13 +45,17 @@ class PdfDownloadController extends Controller
             );
         }
 
+        // nginx already emits "X-Frame-Options: SAMEORIGIN" at the server
+        // level (with `always`), so emitting it here as well produces a
+        // duplicate header. Chrome treats duplicate XFO as invalid and
+        // falls back to DENY, which makes the inline preview iframe
+        // appear blank. Let nginx be the single source of truth.
         return Storage::disk('local')->response(
             $render->file_path,
             $downloadName,
             [
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => 'inline; filename="'.$downloadName.'"',
-                'X-Frame-Options' => 'SAMEORIGIN',
             ]
         );
     }
