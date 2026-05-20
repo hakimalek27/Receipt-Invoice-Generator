@@ -683,8 +683,31 @@ function reset(target, values) {
                             <input v-model="companyForm.business_activity_description" class="mt-1 w-full rounded-md border-gray-300" />
                         </label>
                         <label class="text-sm font-medium text-gray-700 md:col-span-2">
-                            Address
-                            <textarea v-model="companyForm.address" rows="3" class="mt-1 w-full rounded-md border-gray-300" />
+                            Address Line 1
+                            <input v-model="companyForm.address" class="mt-1 w-full rounded-md border-gray-300" placeholder='e.g. "Wisma UOA II, Unit No: 15-13A"' />
+                            <span class="mt-1 block text-xs font-normal text-gray-500">Street/unit only. Do not include postcode, city, or state — those have their own fields below.</span>
+                        </label>
+                        <label class="text-sm font-medium text-gray-700 md:col-span-2">
+                            Address Line 2 <span class="text-xs font-normal text-gray-400">(optional)</span>
+                            <input v-model="companyForm.address_line_2" class="mt-1 w-full rounded-md border-gray-300" placeholder='e.g. "UOA Business Centre, Jalan Pinang"' />
+                            <span class="mt-1 block text-xs font-normal text-gray-500">Building / area name. Do not repeat what is already in Line 1 — duplicates will be hidden from the PDF.</span>
+                        </label>
+                        <label class="text-sm font-medium text-gray-700">
+                            Postcode
+                            <input v-model="companyForm.postcode" class="mt-1 w-full rounded-md border-gray-300" placeholder="50450" />
+                        </label>
+                        <label class="text-sm font-medium text-gray-700">
+                            City
+                            <input v-model="companyForm.city" class="mt-1 w-full rounded-md border-gray-300" placeholder="Kuala Lumpur" />
+                        </label>
+                        <label class="text-sm font-medium text-gray-700">
+                            State
+                            <input v-model="companyForm.state" class="mt-1 w-full rounded-md border-gray-300" placeholder="Wilayah Persekutuan" />
+                        </label>
+                        <label class="text-sm font-medium text-gray-700">
+                            Country
+                            <input v-model="companyForm.country" maxlength="2" class="mt-1 w-full rounded-md border-gray-300 uppercase" placeholder="MY" />
+                            <span class="mt-1 block text-xs font-normal text-gray-500">ISO 2-letter code (e.g. MY, SG).</span>
                         </label>
                         <label class="text-sm font-medium text-gray-700">
                             Phone

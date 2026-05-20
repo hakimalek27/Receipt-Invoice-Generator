@@ -7,10 +7,9 @@
             $customerLines = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $rawAddress))));
         }
     }
-    $attn = $customer->contact_person ?? null;
+    $attn = $customer->attention_to ?? null;
     $tel = $customer->phone ?? null;
     $email = $customer->email ?? null;
-    $fax = $customer->fax ?? null;
 @endphp
 <div class="ws-billto-label">{{ $label }}</div>
 @if($customer)
@@ -27,9 +26,6 @@
         @endif
         @if($email)
             <tr><td class="ws-billto-key">Email:</td><td class="ws-billto-val">{{ $email }}</td></tr>
-        @endif
-        @if($fax)
-            <tr><td class="ws-billto-key">Fax:</td><td class="ws-billto-val">{{ $fax }}</td></tr>
         @endif
     </table>
 @else
