@@ -123,6 +123,7 @@ class DocumentController extends Controller
         $data = $request->validate([
             'document_type' => 'required|string',
             'customer_id' => 'nullable|exists:customers,id',
+            'customer_name' => 'nullable|string|max:255',
             'document_date' => 'nullable|date',
             'due_date' => 'nullable|date',
             'currency' => 'nullable|string|size:3',
@@ -156,6 +157,8 @@ class DocumentController extends Controller
             return response()->json(['error' => 'Non-MYR documents require an FX rate snapshot'], 422);
         }
 
+        $data = $this->resolveCustomerName($data, $data['company_id']);
+
         try {
             $draft = $this->workflow->createDraft($data);
         } catch (\RuntimeException $e) {
@@ -179,6 +182,7 @@ class DocumentController extends Controller
         $data = $request->validate([
             'document_type' => 'nullable|string|max:50',
             'customer_id' => 'nullable|exists:customers,id',
+            'customer_name' => 'nullable|string|max:255',
             'document_date' => 'nullable|date',
             'due_date' => 'nullable|date',
             'currency' => 'nullable|string|size:3',
@@ -212,6 +216,9 @@ class DocumentController extends Controller
         if ($data['currency'] !== 'MYR' && empty($data['fx_rate']) && empty($document->fx_rate)) {
             return response()->json(['error' => 'Non-MYR documents require an FX rate snapshot'], 422);
         }
+
+        $data = $this->resolveCustomerName($data, $document->company_id);
+
         if (! empty($data['customer_id'])
             && ! Customer::whereKey($data['customer_id'])->where('company_id', $document->company_id)->exists()) {
             return response()->json(['error' => 'Customer does not belong to this company'], 422);
@@ -391,6 +398,30 @@ class DocumentController extends Controller
         }
 
         return response()->json($document);
+    }
+
+    /**
+     * Resolve a free-form customer_name into a customer_id, auto-creating a
+     * lightweight Customer record (scoped to the active company) when the
+     * typed name does not match an existing customer. customer_name is then
+     * removed from $data so it never reaches the documents table.
+     */
+    private function resolveCustomerName(array $data, int $companyId): array
+    {
+        $name = isset($data['customer_name']) ? trim((string) $data['customer_name']) : '';
+        unset($data['customer_name']);
+
+        if (! empty($data['customer_id']) || $name === '') {
+            return $data;
+        }
+
+        $customer = Customer::firstOrCreate(
+            ['company_id' => $companyId, 'name' => $name],
+            ['is_active' => true, 'country' => 'MY']
+        );
+        $data['customer_id'] = $customer->id;
+
+        return $data;
     }
 
     private function itemPayload(int $documentId, array $itemData, int $index): array

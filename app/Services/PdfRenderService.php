@@ -193,6 +193,11 @@ class PdfRenderService
 
         $company = $document->company;
         $customer = $document->customer;
+        $brandingPaths = [
+            'logo' => $company?->logo_path,
+            'signature' => $company?->signature_path,
+            'stamp' => $company?->stamp_path,
+        ];
         if ($document->isIssued()) {
             $company = $document->issuer_snapshot_json
                 ? $this->snapshotObject($document->issuer_snapshot_json)
@@ -200,6 +205,12 @@ class PdfRenderService
             $customer = $document->buyer_snapshot_json
                 ? $this->snapshotObject($document->buyer_snapshot_json)
                 : $customer;
+            // Prefer paths captured in the snapshot if present; fall back to live paths.
+            $brandingPaths = [
+                'logo' => data_get($document->issuer_snapshot_json, 'logo_path') ?? $brandingPaths['logo'],
+                'signature' => data_get($document->issuer_snapshot_json, 'signature_path') ?? $brandingPaths['signature'],
+                'stamp' => data_get($document->issuer_snapshot_json, 'stamp_path') ?? $brandingPaths['stamp'],
+            ];
         }
 
         // Use snapshotted value for issued documents; recompute only for drafts
@@ -256,12 +267,34 @@ class PdfRenderService
             'isLastPage' => false,
             'pageNumber' => 1,
             'brand' => $this->brandPalette($company),
+            'logoDataUri' => $this->brandingDataUri($brandingPaths['logo']),
+            'signatureDataUri' => $this->brandingDataUri($brandingPaths['signature']),
+            'stampDataUri' => $this->brandingDataUri($brandingPaths['stamp']),
             'boilerplate' => $this->boilerplate->resolve(
                 $companyBoilerplate,
                 $document->document_type,
                 $company?->name
             ),
         ];
+    }
+
+    /**
+     * Inline branding assets as base64 data URIs so DomPDF (isRemoteEnabled=false)
+     * and Playwright both render them without HTTP fetches.
+     */
+    private function brandingDataUri(?string $relativePath): ?string
+    {
+        if (! $relativePath) {
+            return null;
+        }
+        $disk = Storage::disk('public');
+        if (! $disk->exists($relativePath)) {
+            return null;
+        }
+        $bytes = $disk->get($relativePath);
+        $mime = $disk->mimeType($relativePath) ?: 'image/png';
+
+        return 'data:'.$mime.';base64,'.base64_encode($bytes);
     }
 
     private function brandPalette($company): array

@@ -122,6 +122,22 @@ async function bulkDelete() {
     }
 }
 
+async function deleteDraft(docId) {
+    if (!window.confirm('Permanently delete this draft? This cannot be undone.')) return;
+    busy.value = true;
+    try {
+        await apiFetch(`/api/documents/${docId}`, { method: 'DELETE' });
+        selectedIds.value.delete(docId);
+        selectedIds.value = new Set(selectedIds.value);
+        message.value = 'Draft deleted.';
+        router.reload({ only: ['documents'] });
+    } catch (e) {
+        alert(e.message);
+    } finally {
+        busy.value = false;
+    }
+}
+
 function applyFilters() {
     if (searchTimer) clearTimeout(searchTimer);
     router.get(route('documents.index'), filter, {
@@ -285,6 +301,13 @@ function chainTooltip(document) {
                                     <div class="flex justify-end gap-2 text-xs">
                                         <Link :href="route('documents.edit', document.id)" class="font-medium text-indigo-700 hover:underline">Open</Link>
                                         <button type="button" class="font-medium text-gray-600 hover:text-indigo-700 hover:underline" @click="duplicateDocument(document.id)">Duplicate</button>
+                                        <button
+                                            v-if="document.status === 'draft'"
+                                            type="button"
+                                            class="font-medium text-red-700 hover:underline disabled:opacity-50"
+                                            :disabled="busy"
+                                            @click="deleteDraft(document.id)"
+                                        >Delete</button>
                                     </div>
                                 </td>
                             </tr>

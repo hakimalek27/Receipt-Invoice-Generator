@@ -40,6 +40,28 @@ body {
     text-underline-offset: 3px;
 }
 
+/* ============ Header row (logo + company block) ============ */
+.ws-header-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 4px 0 0;
+}
+.ws-header-logo-cell {
+    width: 78px;
+    vertical-align: middle;
+    padding: 4px 8px 4px 4px;
+    border-bottom: 1px solid #cccccc;
+}
+.ws-header-logo-img {
+    max-width: 72px;
+    max-height: 72px;
+    display: block;
+}
+.ws-header-text-cell {
+    vertical-align: middle;
+    text-align: center;
+}
+
 /* ============ Company identity block (centered) ============ */
 .ws-company-block {
     text-align: center;

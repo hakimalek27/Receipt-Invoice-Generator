@@ -157,10 +157,13 @@ function productAutofill(index) {
 }
 
 function payload() {
-    const customerMatch = props.customers?.find((c) => c.name === form.customer_name?.trim());
+    const trimmedCustomerName = form.customer_name?.trim() || '';
+    const customerMatch = props.customers?.find((c) => c.name === trimmedCustomerName);
     return {
         document_type: form.document_type,
         customer_id: customerMatch?.id ?? null,
+        // Backend find-or-creates a Customer record when no id matches but a name is typed.
+        customer_name: customerMatch ? null : (trimmedCustomerName || null),
         document_date: form.document_date,
         due_date: form.due_date || null,
         currency: form.currency,
@@ -209,7 +212,7 @@ async function saveDraft() {
     }
 }
 
-const previewModal = ref({ open: false, paper: 'a4', url: '' });
+const previewModal = ref({ open: false, paper: 'a4', url: '', maximized: false });
 
 async function previewPdf(paper = 'a4') {
     if (!form.id) {
@@ -223,11 +226,16 @@ async function previewPdf(paper = 'a4') {
         open: true,
         paper,
         url: `/api/documents/${form.id}/pdf?paper=${paper}&_=${cacheBuster}`,
+        maximized: false,
     };
 }
 
 function closePreview() {
-    previewModal.value = { open: false, paper: 'a4', url: '' };
+    previewModal.value = { open: false, paper: 'a4', url: '', maximized: false };
+}
+
+function toggleMaximize() {
+    previewModal.value.maximized = !previewModal.value.maximized;
 }
 
 function downloadPdf(paper = 'a4') {
@@ -779,8 +787,12 @@ async function convertDocument() {
             @click.self="closePreview"
         >
             <div
-                class="flex max-h-[95vh] flex-col rounded-lg bg-white shadow-2xl"
-                :class="previewModal.paper === '60mm' ? 'w-[320px]' : 'w-full max-w-[860px]'"
+                class="flex flex-col rounded-lg bg-white shadow-2xl transition-[width,height,max-width,max-height] duration-150"
+                :class="previewModal.maximized
+                    ? 'h-[98vh] w-[98vw] max-h-[98vh]'
+                    : (previewModal.paper === '60mm'
+                        ? 'max-h-[95vh] w-[360px]'
+                        : 'max-h-[95vh] w-full max-w-[1100px]')"
             >
                 <div class="flex items-center justify-between border-b border-gray-200 px-4 py-2">
                     <div>
@@ -792,6 +804,14 @@ async function convertDocument() {
                         </h3>
                     </div>
                     <div class="flex items-center gap-2">
+                        <button
+                            type="button"
+                            class="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                            @click="toggleMaximize"
+                            :title="previewModal.maximized ? 'Restore default size' : 'Maximize'"
+                        >
+                            {{ previewModal.maximized ? 'Restore' : 'Maximize' }}
+                        </button>
                         <button
                             type="button"
                             class="rounded-md bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800"
@@ -810,7 +830,9 @@ async function convertDocument() {
                 </div>
                 <div
                     class="flex-1 overflow-hidden rounded-b-lg bg-gray-100"
-                    :style="previewModal.paper === '60mm' ? { height: '70vh' } : { height: '85vh' }"
+                    :style="previewModal.maximized
+                        ? { height: 'calc(98vh - 48px)' }
+                        : (previewModal.paper === '60mm' ? { height: '85vh' } : { height: '88vh' })"
                 >
                     <iframe
                         :src="previewModal.url"
