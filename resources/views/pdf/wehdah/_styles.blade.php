@@ -40,12 +40,34 @@ body {
     text-underline-offset: 3px;
 }
 
-/* ============ Inline logo (sits next to company name) ============ */
-.ws-inline-logo {
-    height: 38px;
-    width: auto;
+/* ============ Header row: logo cell + company block cell ============ */
+.ws-header-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 4px 0 4px;
+}
+.ws-header-logo-cell {
+    width: 170px;
     vertical-align: middle;
-    margin-right: 10px;
+    padding: 6px 12px 6px 4px;
+    border-bottom: 1px solid #cccccc;
+}
+.ws-header-logo-img {
+    max-width: 160px;
+    max-height: 152px;
+    display: block;
+}
+.ws-header-text-cell {
+    vertical-align: middle;
+    padding: 4px 0 3px;
+    border-bottom: 1px solid #cccccc;
+}
+/* Suppress the inner block's own bottom border so the table cells'
+   shared bottom border is the only visual divider. */
+.ws-header-text-cell .ws-company-block {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
 }
 
 /* ============ Company identity block (centered) ============ */
