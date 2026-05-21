@@ -193,6 +193,9 @@ class PdfRenderService
 
         $company = $document->company;
         $customer = $document->customer;
+        // Read style preferences from the LIVE company (not the snapshot) so the
+        // admin's master-data toggles apply universally — even to issued docs.
+        $showComputerGenFooter = (bool) data_get($company?->settings, 'show_computer_generated_footer', true);
         $brandingPaths = [
             'logo' => $company?->logo_path,
             'signature' => $company?->signature_path,
@@ -270,6 +273,7 @@ class PdfRenderService
             'logoDataUri' => $this->brandingDataUri($brandingPaths['logo']),
             'signatureDataUri' => $this->brandingDataUri($brandingPaths['signature']),
             'stampDataUri' => $this->brandingDataUri($brandingPaths['stamp']),
+            'showComputerGenFooter' => $showComputerGenFooter,
             'boilerplate' => $this->boilerplate->resolve(
                 $companyBoilerplate,
                 $document->document_type,

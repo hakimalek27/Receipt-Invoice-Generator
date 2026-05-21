@@ -41,6 +41,7 @@ const companyForm = reactive({
     country: props.company?.country || 'MY',
     phone: props.company?.phone || '',
     email: props.company?.email || '',
+    show_computer_generated_footer: props.company?.settings?.show_computer_generated_footer ?? true,
 });
 
 const brandForm = reactive({
@@ -249,9 +250,16 @@ const numberingPreview = computed(() => {
 
 async function saveCompany() {
     await run(async () => {
+        const { show_computer_generated_footer, ...rest } = companyForm;
         await apiFetch(`/api/companies/${props.company.id}`, {
             method: 'PATCH',
-            body: companyForm,
+            body: {
+                ...rest,
+                settings: {
+                    ...(props.company?.settings || {}),
+                    show_computer_generated_footer,
+                },
+            },
         });
         notice.value = 'Company profile saved.';
     });
@@ -716,6 +724,13 @@ function reset(target, values) {
                         <label class="text-sm font-medium text-gray-700">
                             Email
                             <input v-model="companyForm.email" type="email" class="mt-1 w-full rounded-md border-gray-300" />
+                        </label>
+                        <label class="md:col-span-2 mt-2 flex items-start gap-2 text-sm font-medium text-gray-700">
+                            <input v-model="companyForm.show_computer_generated_footer" type="checkbox" class="mt-0.5 rounded border-gray-300" />
+                            <span>
+                                Show "Computer-generated document · &lt;timestamp&gt;" footer on PDFs
+                                <span class="mt-1 block text-xs font-normal text-gray-500">Uncheck to hide the auto-generated audit footer at the bottom of every invoice/quotation/DO/receipt PDF.</span>
+                            </span>
                         </label>
                     </div>
                     <button type="button" class="mt-5 rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="busy" @click="saveCompany">

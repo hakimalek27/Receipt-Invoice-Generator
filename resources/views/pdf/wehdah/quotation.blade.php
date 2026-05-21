@@ -97,9 +97,11 @@
     <div class="ws-page-number">Page {{ $pageIndex + 1 }} of {{ count($itemPages) }}</div>
 @endforeach
 
+@if($showComputerGenFooter ?? true)
 <div class="ws-footer-doc">
     Computer-generated document &middot; {{ now()->setTimezone('Asia/Kuala_Lumpur')->format('d/m/Y h:i A') }} MYT
 </div>
+@endif
 
 @include('pdf.partials.artwork-pages', ['documentTitleEn' => 'QUOTATION', 'showConfirmation' => true])
 </body>
