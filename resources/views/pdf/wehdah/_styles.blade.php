@@ -40,26 +40,12 @@ body {
     text-underline-offset: 3px;
 }
 
-/* ============ Header row (logo + company block) ============ */
-.ws-header-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 4px 0 0;
-}
-.ws-header-logo-cell {
-    width: 78px;
+/* ============ Inline logo (sits next to company name) ============ */
+.ws-inline-logo {
+    height: 38px;
+    width: auto;
     vertical-align: middle;
-    padding: 4px 8px 4px 4px;
-    border-bottom: 1px solid #cccccc;
-}
-.ws-header-logo-img {
-    max-width: 72px;
-    max-height: 72px;
-    display: block;
-}
-.ws-header-text-cell {
-    vertical-align: middle;
-    text-align: center;
+    margin-right: 10px;
 }
 
 /* ============ Company identity block (centered) ============ */
@@ -270,9 +256,23 @@ table.ws-signature { width: 100%; margin-top: 10px; border-collapse: collapse; }
 .ws-signature-intro { font-size: 8.5pt; margin-bottom: 18px; }
 .ws-signature-line { border-top: 1px solid {{ $textPrimary }}; margin-bottom: 2px; }
 .ws-signature-label { font-size: 8.5pt; font-weight: bold; color: {{ $textPrimary }}; }
-.ws-signature-images { position: relative; height: 44px; margin-bottom: 2px; }
-.ws-signature-images img.ws-sig-img { max-height: 36px; max-width: 140px; vertical-align: bottom; }
-.ws-signature-images img.ws-stamp-img { max-height: 44px; max-width: 70px; vertical-align: bottom; margin-left: 6px; opacity: 0.9; }
+.ws-signature-images {
+    position: relative;
+    height: 132px;
+    margin-bottom: 2px;
+    text-align: center;
+}
+.ws-signature-images img.ws-sig-img {
+    max-height: 108px;
+    max-width: 420px;
+    vertical-align: bottom;
+}
+.ws-signature-images img.ws-stamp-img {
+    max-height: 132px;
+    max-width: 210px;
+    vertical-align: bottom;
+    opacity: 0.9;
+}
 
 /* ============ Payment meta box (OR only) ============ */
 .ws-payment-meta {

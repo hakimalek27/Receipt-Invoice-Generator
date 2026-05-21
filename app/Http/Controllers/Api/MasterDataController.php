@@ -76,6 +76,8 @@ class MasterDataController extends Controller
             'pdf_boilerplate.official_receipt.signature_left_label' => 'nullable|string|max:200',
             'pdf_boilerplate.official_receipt.signature_right_intro' => 'nullable|string|max:200',
             'pdf_boilerplate.official_receipt.signature_right_label' => 'nullable|string|max:200',
+            'settings' => 'nullable|array',
+            'settings.show_computer_generated_footer' => 'nullable|boolean',
         ]));
 
         return response()->json($company->fresh());
