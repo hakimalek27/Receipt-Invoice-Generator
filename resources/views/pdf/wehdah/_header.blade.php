@@ -49,29 +49,37 @@
         }
         $logoSrc = $logoDataUri ?? null;
     @endphp
-    <div class="ws-company-block">
-        <div class="ws-company-name">
-            @if($logoSrc)
-                <img src="{{ $logoSrc }}" alt="logo" class="ws-inline-logo">
-            @endif
-            {{ strtoupper($company->name ?? '') }}
-            @if(!empty($company->registration_number))
-                <span class="ws-company-reg">{{ $company->registration_number }}</span>
-            @endif
-        </div>
-        @if($addr1 !== '')
-            <div class="ws-company-address">{{ $addr1 }}</div>
-        @endif
-        @if($addr2 !== '')
-            <div class="ws-company-address">{{ $addr2 }}</div>
-        @endif
-        @if($showRegion)
-            <div class="ws-company-address">{{ $regionLineExpanded }}</div>
-        @endif
-        <div class="ws-company-contact">
-            @if(!empty($company->phone))Phone: {{ $company->phone }}@endif
-            @if(!empty($company->phone) && !empty($company->email)) &nbsp; @endif
-            @if(!empty($company->email))Email: {{ $company->email }}@endif
-        </div>
-    </div>
+    <table class="ws-header-table">
+        <tr>
+            <td class="ws-header-logo-cell">
+                @if($logoSrc)
+                    <img src="{{ $logoSrc }}" alt="logo" class="ws-header-logo-img">
+                @endif
+            </td>
+            <td class="ws-header-text-cell">
+                <div class="ws-company-block">
+                    <div class="ws-company-name">
+                        {{ strtoupper($company->name ?? '') }}
+                        @if(!empty($company->registration_number))
+                            <span class="ws-company-reg">{{ $company->registration_number }}</span>
+                        @endif
+                    </div>
+                    @if($addr1 !== '')
+                        <div class="ws-company-address">{{ $addr1 }}</div>
+                    @endif
+                    @if($addr2 !== '')
+                        <div class="ws-company-address">{{ $addr2 }}</div>
+                    @endif
+                    @if($showRegion)
+                        <div class="ws-company-address">{{ $regionLineExpanded }}</div>
+                    @endif
+                    <div class="ws-company-contact">
+                        @if(!empty($company->phone))Phone: {{ $company->phone }}@endif
+                        @if(!empty($company->phone) && !empty($company->email)) &nbsp; @endif
+                        @if(!empty($company->email))Email: {{ $company->email }}@endif
+                    </div>
+                </div>
+            </td>
+        </tr>
+    </table>
 @endif
