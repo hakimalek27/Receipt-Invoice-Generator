@@ -78,6 +78,7 @@ const customerForm = reactive({
     attention_to: '',
     email: '',
     phone: '',
+    fax: '',
     address: '',
     postcode: '',
     city: '',
@@ -277,6 +278,7 @@ async function createCustomer() {
             attention_to: '',
             email: '',
             phone: '',
+            fax: '',
             address: '',
             postcode: '',
             city: '',
@@ -324,6 +326,7 @@ function openCustomerEdit(c) {
         attention_to: c.attention_to ?? '',
         email: c.email ?? '',
         phone: c.phone ?? '',
+        fax: c.fax ?? '',
         address: c.address ?? '',
         postcode: c.postcode ?? '',
         city: c.city ?? '',
@@ -339,7 +342,7 @@ function openCustomerEdit(c) {
 function cancelCustomerEdit() {
     editingCustomerId.value = null;
     reset(customerForm, {
-        name: '', attention_to: '', email: '', phone: '', address: '',
+        name: '', attention_to: '', email: '', phone: '', fax: '', address: '',
         postcode: '', city: '', state: '', country: 'MY',
         tax_identifier: '', brn_registration_number: '', sst_registration_number: '', msic_code: '',
     });
@@ -914,6 +917,7 @@ function reset(target, values) {
                                 <input v-model="customerForm.attention_to" placeholder="Attention to" class="rounded-md border-gray-300" />
                                 <input v-model="customerForm.email" type="email" placeholder="Email" class="rounded-md border-gray-300" />
                                 <input v-model="customerForm.phone" placeholder="Phone" class="rounded-md border-gray-300" />
+                                <input v-model="customerForm.fax" placeholder="Fax" class="rounded-md border-gray-300" />
                                 <textarea v-model="customerForm.address" rows="3" placeholder="Address" class="rounded-md border-gray-300" />
                                 <div class="grid grid-cols-2 gap-3">
                                     <input v-model="customerForm.tax_identifier" placeholder="TIN" class="rounded-md border-gray-300" />
