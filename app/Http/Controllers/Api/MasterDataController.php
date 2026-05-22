@@ -224,6 +224,7 @@ class MasterDataController extends Controller
             'postcode' => 'nullable|string|max:10',
             'country' => 'nullable|string|min:2|max:3',
             'phone' => 'nullable|string|max:100',
+            'fax' => 'nullable|string|max:50',
             'email' => 'nullable|email|max:255',
             'tax_identifier' => 'nullable|string|max:100',
             'brn_registration_number' => 'nullable|string|max:100',

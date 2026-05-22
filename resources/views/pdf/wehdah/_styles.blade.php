@@ -47,15 +47,16 @@ body {
     margin: 4px 0 4px;
 }
 .ws-header-logo-cell {
-    width: 170px;
+    width: 210px;
     vertical-align: middle;
-    padding: 6px 12px 6px 4px;
+    padding: 6px 1cm 6px 4px;
+    text-align: right;
     border-bottom: 1px solid #cccccc;
 }
 .ws-header-logo-img {
     max-width: 160px;
     max-height: 152px;
-    display: block;
+    display: inline-block;
 }
 .ws-header-text-cell {
     vertical-align: middle;
@@ -111,6 +112,11 @@ body {
 .ws-meta-col-left { width: 58%; padding-right: 8px; }
 .ws-meta-col-right { width: 42%; }
 
+.ws-billto-box {
+    border: 1px solid #333333;
+    padding: 5px 8px 6px;
+    margin-bottom: 0;
+}
 .ws-billto-label {
     font-size: 9pt; font-weight: bold; color: {{ $accentDark }};
     border-bottom: 1px solid {{ $accentDark }};
@@ -118,9 +124,10 @@ body {
 }
 .ws-billto-name { font-size: 10pt; font-weight: bold; color: {{ $textPrimary }}; }
 .ws-billto-line { font-size: 8.5pt; color: {{ $textPrimary }}; line-height: 1.4; }
-.ws-billto-table { width: 100%; margin-top: 2px; font-size: 8.5pt; }
-.ws-billto-table td { padding: 0 4px 0 0; vertical-align: top; line-height: 1.4; }
+.ws-billto-table { width: 100%; margin-top: 4px; font-size: 8.5pt; }
+.ws-billto-table td { padding: 0 4px 0 0; vertical-align: top; line-height: 1.5; }
 .ws-billto-key { font-weight: bold; width: 42px; color: {{ $textMuted }}; }
+.ws-billto-key-fax { width: 38px; padding-left: 6px; }
 .ws-billto-val { color: {{ $textPrimary }}; }
 
 .ws-meta-table { width: 100%; border-collapse: collapse; font-size: 9pt; }
