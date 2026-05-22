@@ -50,7 +50,7 @@ body {
 }
 .ws-header-logo-abs {
     position: absolute;
-    left: 2cm;
+    left: 1.8cm;
     top: -0.2cm;
     max-width: 152px;
     max-height: 144px;
