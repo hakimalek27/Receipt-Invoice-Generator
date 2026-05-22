@@ -50,10 +50,10 @@ body {
 }
 .ws-header-logo-abs {
     position: absolute;
-    left: 2.5cm;
-    top: 4px;
-    max-width: 160px;
-    max-height: 152px;
+    left: 2cm;
+    top: -0.2cm;
+    max-width: 152px;
+    max-height: 144px;
 }
 /* When header-wrap encloses company-block, the wrap owns the divider line. */
 .ws-header-wrap .ws-company-block {
