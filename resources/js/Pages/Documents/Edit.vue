@@ -37,6 +37,11 @@ const form = reactive({
     document_type: props.document?.document_type ?? 'invoice',
     customer_id: props.document?.customer_id ?? '',
     customer_name: props.document?.customer?.name ?? '',
+    customer_attention_to: props.document?.customer?.attention_to ?? '',
+    customer_phone: props.document?.customer?.phone ?? '',
+    customer_fax: props.document?.customer?.fax ?? '',
+    customer_email: props.document?.customer?.email ?? '',
+    customer_address: props.document?.customer?.address ?? '',
     document_date: props.document?.document_date?.slice(0, 10) ?? today(),
     due_date: props.document?.due_date?.slice(0, 10) ?? '',
     currency: props.document?.currency ?? 'MYR',
@@ -134,6 +139,26 @@ function removeItem(index) {
     }
 }
 
+function customerAutofill() {
+    const name = form.customer_name?.trim();
+    if (!name) {
+        form.customer_id = '';
+        // Leave the other detail fields untouched so a typed-but-unsaved entry isn't wiped mid-edit.
+        return;
+    }
+    const match = props.customers?.find((c) => c.name === name);
+    if (match) {
+        form.customer_id = match.id;
+        form.customer_attention_to = match.attention_to ?? '';
+        form.customer_phone = match.phone ?? '';
+        form.customer_fax = match.fax ?? '';
+        form.customer_email = match.email ?? '';
+        form.customer_address = match.address ?? '';
+    } else {
+        form.customer_id = '';
+    }
+}
+
 function productAutofill(index) {
     const name = form.items[index].product_name?.trim();
     if (!name) {
@@ -162,8 +187,14 @@ function payload() {
     return {
         document_type: form.document_type,
         customer_id: customerMatch?.id ?? null,
-        // Backend find-or-creates a Customer record when no id matches but a name is typed.
+        // Backend find-or-creates a Customer record when no id matches but a name is typed,
+        // and updates the customer with the detail fields below (2-way sync with Master Data).
         customer_name: customerMatch ? null : (trimmedCustomerName || null),
+        customer_attention_to: form.customer_attention_to?.trim() || null,
+        customer_phone: form.customer_phone?.trim() || null,
+        customer_fax: form.customer_fax?.trim() || null,
+        customer_email: form.customer_email?.trim() || null,
+        customer_address: form.customer_address?.trim() || null,
         document_date: form.document_date,
         due_date: form.due_date || null,
         currency: form.currency,
@@ -519,6 +550,8 @@ async function convertDocument() {
                                 Customer
                                 <input v-model="form.customer_name" :disabled="!isDraft"
                                        list="customer-options"
+                                       @change="customerAutofill"
+                                       @blur="customerAutofill"
                                        class="mt-1 w-full rounded-md border-gray-300 text-sm"
                                        placeholder="Type or pick (blank = walk-in)">
                             </label>
@@ -530,6 +563,34 @@ async function convertDocument() {
                                 Due / Valid Until
                                 <input v-model="form.due_date" :disabled="!isDraft" type="date" class="mt-1 w-full rounded-md border-gray-300 text-sm">
                             </label>
+                        </div>
+                        <div class="mt-4 rounded-md border border-gray-200 bg-gray-50 p-3" v-if="form.customer_name">
+                            <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                Customer Details
+                                <span class="ml-1 font-normal normal-case text-gray-400">— saved to Master Data on draft save</span>
+                            </div>
+                            <div class="grid gap-3 md:grid-cols-3">
+                                <label class="text-xs font-medium text-gray-700">
+                                    Attn
+                                    <input v-model="form.customer_attention_to" :disabled="!isDraft" class="mt-1 w-full rounded-md border-gray-300 text-sm" placeholder="Attention to">
+                                </label>
+                                <label class="text-xs font-medium text-gray-700">
+                                    Tel
+                                    <input v-model="form.customer_phone" :disabled="!isDraft" class="mt-1 w-full rounded-md border-gray-300 text-sm" placeholder="Phone">
+                                </label>
+                                <label class="text-xs font-medium text-gray-700">
+                                    Fax
+                                    <input v-model="form.customer_fax" :disabled="!isDraft" class="mt-1 w-full rounded-md border-gray-300 text-sm" placeholder="Fax">
+                                </label>
+                                <label class="text-xs font-medium text-gray-700 md:col-span-3">
+                                    Email
+                                    <input v-model="form.customer_email" :disabled="!isDraft" type="email" class="mt-1 w-full rounded-md border-gray-300 text-sm" placeholder="Email">
+                                </label>
+                                <label class="text-xs font-medium text-gray-700 md:col-span-3">
+                                    Address
+                                    <textarea v-model="form.customer_address" :disabled="!isDraft" rows="2" class="mt-1 w-full rounded-md border-gray-300 text-sm" placeholder="Multi-line address (renders verbatim in PDF)" />
+                                </label>
+                            </div>
                         </div>
                         <div class="mt-4 grid gap-4 md:grid-cols-4">
                             <label class="text-sm font-medium text-gray-700">

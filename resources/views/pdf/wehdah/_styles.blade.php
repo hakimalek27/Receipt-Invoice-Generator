@@ -40,32 +40,23 @@ body {
     text-underline-offset: 3px;
 }
 
-/* ============ Header row: logo cell + company block cell ============ */
-.ws-header-table {
-    width: 100%;
-    border-collapse: collapse;
+/* ============ Header wrap: full-width centered text + absolute logo ============ */
+.ws-header-wrap {
+    position: relative;
     margin: 4px 0 4px;
-}
-.ws-header-logo-cell {
-    width: 210px;
-    vertical-align: middle;
-    padding: 6px 1cm 6px 4px;
-    text-align: right;
-    border-bottom: 1px solid #cccccc;
-}
-.ws-header-logo-img {
-    max-width: 160px;
-    max-height: 152px;
-    display: inline-block;
-}
-.ws-header-text-cell {
-    vertical-align: middle;
     padding: 4px 0 3px;
     border-bottom: 1px solid #cccccc;
+    min-height: 160px;
 }
-/* Suppress the inner block's own bottom border so the table cells'
-   shared bottom border is the only visual divider. */
-.ws-header-text-cell .ws-company-block {
+.ws-header-logo-abs {
+    position: absolute;
+    left: 4cm;
+    top: 4px;
+    max-width: 160px;
+    max-height: 152px;
+}
+/* When header-wrap encloses company-block, the wrap owns the divider line. */
+.ws-header-wrap .ws-company-block {
     border-bottom: none;
     margin-bottom: 0;
     padding-bottom: 0;

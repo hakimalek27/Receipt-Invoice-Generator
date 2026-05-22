@@ -124,6 +124,11 @@ class DocumentController extends Controller
             'document_type' => 'required|string',
             'customer_id' => 'nullable|exists:customers,id',
             'customer_name' => 'nullable|string|max:255',
+            'customer_attention_to' => 'nullable|string|max:255',
+            'customer_phone' => 'nullable|string|max:100',
+            'customer_fax' => 'nullable|string|max:50',
+            'customer_email' => 'nullable|email|max:255',
+            'customer_address' => 'nullable|string',
             'document_date' => 'nullable|date',
             'due_date' => 'nullable|date',
             'currency' => 'nullable|string|size:3',
@@ -183,6 +188,11 @@ class DocumentController extends Controller
             'document_type' => 'nullable|string|max:50',
             'customer_id' => 'nullable|exists:customers,id',
             'customer_name' => 'nullable|string|max:255',
+            'customer_attention_to' => 'nullable|string|max:255',
+            'customer_phone' => 'nullable|string|max:100',
+            'customer_fax' => 'nullable|string|max:50',
+            'customer_email' => 'nullable|email|max:255',
+            'customer_address' => 'nullable|string',
             'document_date' => 'nullable|date',
             'due_date' => 'nullable|date',
             'currency' => 'nullable|string|size:3',
@@ -401,24 +411,64 @@ class DocumentController extends Controller
     }
 
     /**
-     * Resolve a free-form customer_name into a customer_id, auto-creating a
-     * lightweight Customer record (scoped to the active company) when the
-     * typed name does not match an existing customer. customer_name is then
-     * removed from $data so it never reaches the documents table.
+     * Resolve the customer block from the request payload:
+     *  - If `customer_id` is set, optionally sync the 5 detail fields back to
+     *    the existing Customer (Master Data ↔ document-create 2-way sync).
+     *  - Otherwise, if `customer_name` is provided, find-or-create a Customer
+     *    scoped to the active company, with the detail fields applied.
+     *
+     * The customer_* keys are stripped from $data so they never reach the
+     * documents table (which has no such columns).
      */
     private function resolveCustomerName(array $data, int $companyId): array
     {
         $name = isset($data['customer_name']) ? trim((string) $data['customer_name']) : '';
+
+        $details = [];
+        foreach ([
+            'customer_attention_to' => 'attention_to',
+            'customer_phone' => 'phone',
+            'customer_fax' => 'fax',
+            'customer_email' => 'email',
+            'customer_address' => 'address',
+        ] as $payloadKey => $customerColumn) {
+            if (array_key_exists($payloadKey, $data)) {
+                $value = $data[$payloadKey];
+                if ($value !== null && $value !== '') {
+                    $details[$customerColumn] = is_string($value) ? trim($value) : $value;
+                } else {
+                    $details[$customerColumn] = null;
+                }
+            }
+            unset($data[$payloadKey]);
+        }
         unset($data['customer_name']);
 
-        if (! empty($data['customer_id']) || $name === '') {
+        if (! empty($data['customer_id'])) {
+            // Existing customer — sync any provided detail fields back to Master Data.
+            if (! empty($details)) {
+                Customer::where('id', $data['customer_id'])
+                    ->where('company_id', $companyId)
+                    ->update($details);
+            }
+
             return $data;
         }
 
+        if ($name === '') {
+            return $data;
+        }
+
+        // New customer typed — create with name + all provided detail fields.
         $customer = Customer::firstOrCreate(
             ['company_id' => $companyId, 'name' => $name],
-            ['is_active' => true, 'country' => 'MY']
+            array_merge(['is_active' => true, 'country' => 'MY'], $details)
         );
+        // If firstOrCreate found an existing record by (company_id, name), apply
+        // the detail fields so a returning user can refresh details on the fly.
+        if (! empty($details) && $customer->wasRecentlyCreated === false) {
+            $customer->update($details);
+        }
         $data['customer_id'] = $customer->id;
 
         return $data;
