@@ -39,7 +39,6 @@ const form = reactive({
     customer_name: props.document?.customer?.name ?? '',
     customer_attention_to: props.document?.customer?.attention_to ?? '',
     customer_phone: props.document?.customer?.phone ?? '',
-    customer_fax: props.document?.customer?.fax ?? '',
     customer_email: props.document?.customer?.email ?? '',
     customer_address: props.document?.customer?.address ?? '',
     document_date: props.document?.document_date?.slice(0, 10) ?? today(),
@@ -151,7 +150,6 @@ function customerAutofill() {
         form.customer_id = match.id;
         form.customer_attention_to = match.attention_to ?? '';
         form.customer_phone = match.phone ?? '';
-        form.customer_fax = match.fax ?? '';
         form.customer_email = match.email ?? '';
         form.customer_address = match.address ?? '';
     } else {
@@ -192,7 +190,6 @@ function payload() {
         customer_name: customerMatch ? null : (trimmedCustomerName || null),
         customer_attention_to: form.customer_attention_to?.trim() || null,
         customer_phone: form.customer_phone?.trim() || null,
-        customer_fax: form.customer_fax?.trim() || null,
         customer_email: form.customer_email?.trim() || null,
         customer_address: form.customer_address?.trim() || null,
         document_date: form.document_date,
@@ -569,7 +566,7 @@ async function convertDocument() {
                                 Customer Details
                                 <span class="ml-1 font-normal normal-case text-gray-400">— saved to Master Data on draft save</span>
                             </div>
-                            <div class="grid gap-3 md:grid-cols-3">
+                            <div class="grid gap-3 md:grid-cols-2">
                                 <label class="text-xs font-medium text-gray-700">
                                     Attn
                                     <input v-model="form.customer_attention_to" :disabled="!isDraft" class="mt-1 w-full rounded-md border-gray-300 text-sm" placeholder="Attention to">
@@ -578,15 +575,11 @@ async function convertDocument() {
                                     Tel
                                     <input v-model="form.customer_phone" :disabled="!isDraft" class="mt-1 w-full rounded-md border-gray-300 text-sm" placeholder="Phone">
                                 </label>
-                                <label class="text-xs font-medium text-gray-700">
-                                    Fax
-                                    <input v-model="form.customer_fax" :disabled="!isDraft" class="mt-1 w-full rounded-md border-gray-300 text-sm" placeholder="Fax">
-                                </label>
-                                <label class="text-xs font-medium text-gray-700 md:col-span-3">
+                                <label class="text-xs font-medium text-gray-700 md:col-span-2">
                                     Email
                                     <input v-model="form.customer_email" :disabled="!isDraft" type="email" class="mt-1 w-full rounded-md border-gray-300 text-sm" placeholder="Email">
                                 </label>
-                                <label class="text-xs font-medium text-gray-700 md:col-span-3">
+                                <label class="text-xs font-medium text-gray-700 md:col-span-2">
                                     Address
                                     <textarea v-model="form.customer_address" :disabled="!isDraft" rows="2" class="mt-1 w-full rounded-md border-gray-300 text-sm" placeholder="Multi-line address (renders verbatim in PDF)" />
                                 </label>

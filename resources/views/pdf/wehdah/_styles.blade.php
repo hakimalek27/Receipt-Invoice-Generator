@@ -50,7 +50,7 @@ body {
 }
 .ws-header-logo-abs {
     position: absolute;
-    left: 1.8cm;
+    left: 1.6cm;
     top: -0.2cm;
     max-width: 152px;
     max-height: 144px;
@@ -118,7 +118,6 @@ body {
 .ws-billto-table { width: 100%; margin-top: 4px; font-size: 8.5pt; }
 .ws-billto-table td { padding: 0 4px 0 0; vertical-align: top; line-height: 1.5; }
 .ws-billto-key { font-weight: bold; width: 42px; color: {{ $textMuted }}; }
-.ws-billto-key-fax { width: 38px; padding-left: 6px; }
 .ws-billto-val { color: {{ $textPrimary }}; }
 
 .ws-meta-table { width: 100%; border-collapse: collapse; font-size: 9pt; }
