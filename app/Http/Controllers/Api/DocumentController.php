@@ -126,7 +126,6 @@ class DocumentController extends Controller
             'customer_name' => 'nullable|string|max:255',
             'customer_attention_to' => 'nullable|string|max:255',
             'customer_phone' => 'nullable|string|max:100',
-            'customer_fax' => 'nullable|string|max:50',
             'customer_email' => 'nullable|email|max:255',
             'customer_address' => 'nullable|string',
             'document_date' => 'nullable|date',
@@ -190,7 +189,6 @@ class DocumentController extends Controller
             'customer_name' => 'nullable|string|max:255',
             'customer_attention_to' => 'nullable|string|max:255',
             'customer_phone' => 'nullable|string|max:100',
-            'customer_fax' => 'nullable|string|max:50',
             'customer_email' => 'nullable|email|max:255',
             'customer_address' => 'nullable|string',
             'document_date' => 'nullable|date',
@@ -428,7 +426,6 @@ class DocumentController extends Controller
         foreach ([
             'customer_attention_to' => 'attention_to',
             'customer_phone' => 'phone',
-            'customer_fax' => 'fax',
             'customer_email' => 'email',
             'customer_address' => 'address',
         ] as $payloadKey => $customerColumn) {

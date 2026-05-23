@@ -10,7 +10,6 @@
     $attn = $customer->attention_to ?? null;
     $tel = $customer->phone ?? null;
     $email = $customer->email ?? null;
-    $fax = $customer->fax ?? null;
 @endphp
 <div class="ws-billto-box">
     <div class="ws-billto-label">{{ $label }}</div>
@@ -22,17 +21,15 @@
         <table class="ws-billto-table">
             <tr>
                 <td class="ws-billto-key">Attn:</td>
-                <td class="ws-billto-val" colspan="3">{{ $attn ?: '' }}</td>
+                <td class="ws-billto-val">{{ $attn ?: '' }}</td>
             </tr>
             <tr>
                 <td class="ws-billto-key">Tel:</td>
                 <td class="ws-billto-val">{{ $tel ?: '' }}</td>
-                <td class="ws-billto-key ws-billto-key-fax">Fax:</td>
-                <td class="ws-billto-val">{{ $fax ?: '' }}</td>
             </tr>
             <tr>
                 <td class="ws-billto-key">Email:</td>
-                <td class="ws-billto-val" colspan="3">{{ $email ?: '' }}</td>
+                <td class="ws-billto-val">{{ $email ?: '' }}</td>
             </tr>
         </table>
     @else
