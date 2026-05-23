@@ -51,6 +51,8 @@ const form = reactive({
     include_arabic_salutation: props.document
         ? Boolean(props.document.include_arabic_salutation)
         : (props.company?.code === 'PGG'),
+    // null = inherit company default; true/false = explicit per-document override.
+    show_computer_generated_footer: props.document?.show_computer_generated_footer ?? null,
     show_amount_in_words: Boolean(props.document?.show_amount_in_words),
     amount_in_words_locale: props.document?.amount_in_words_locale ?? 'ms_MY',
     amount_in_words_currency: props.document?.amount_in_words_currency ?? 'MYR',
@@ -105,6 +107,10 @@ const convertTarget = ref(availableConvertTargets.value[0] ?? 'invoice');
 const voidReason = ref('');
 
 const isDraft = computed(() => form.status === 'draft');
+const companyFooterDefaultLabel = computed(() => {
+    const value = props.company?.settings?.show_computer_generated_footer ?? true;
+    return value ? 'ON' : 'OFF';
+});
 const canPrice = computed(() => form.document_type !== 'delivery_order');
 const subtotal = computed(() => form.items.reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.unit_price || 0)), 0));
 const discountTotal = computed(() => form.items.reduce((sum, item) => sum + Number(item.discount || 0), 0));
@@ -200,6 +206,7 @@ function payload() {
         notes: form.notes || null,
         product_line: form.product_line || null,
         include_arabic_salutation: form.include_arabic_salutation,
+        show_computer_generated_footer: form.show_computer_generated_footer,
         show_amount_in_words: form.show_amount_in_words,
         amount_in_words_locale: form.amount_in_words_locale,
         amount_in_words_currency: form.amount_in_words_currency,
@@ -604,6 +611,17 @@ async function convertDocument() {
                                     <option value="ms_MY">Malay</option>
                                     <option value="en_MY">English</option>
                                 </select>
+                            </label>
+                        </div>
+                        <div class="mt-4 grid gap-4 md:grid-cols-2">
+                            <label class="text-sm font-medium text-gray-700">
+                                "Computer-generated document" footer
+                                <select v-model="form.show_computer_generated_footer" :disabled="!isDraft" class="mt-1 w-full rounded-md border-gray-300 text-sm">
+                                    <option :value="null">Inherit (Company default: {{ companyFooterDefaultLabel }})</option>
+                                    <option :value="true">Always show</option>
+                                    <option :value="false">Always hide</option>
+                                </select>
+                                <span class="mt-1 block text-xs font-normal text-gray-500">Per-invoice override. Leave on "Inherit" to follow the Master Data → Company setting.</span>
                             </label>
                         </div>
                         <div v-if="isPgg" class="mt-4 grid gap-4 rounded-md border border-indigo-100 bg-indigo-50 p-4 md:grid-cols-2">

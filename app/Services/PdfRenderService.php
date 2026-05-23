@@ -193,9 +193,10 @@ class PdfRenderService
 
         $company = $document->company;
         $customer = $document->customer;
-        // Read style preferences from the LIVE company (not the snapshot) so the
-        // admin's master-data toggles apply universally — even to issued docs.
-        $showComputerGenFooter = (bool) data_get($company?->settings, 'show_computer_generated_footer', true);
+        // Per-document override beats the company-wide default. The document
+        // column is nullable — null means "inherit from company".
+        $companyFooterDefault = (bool) data_get($company?->settings, 'show_computer_generated_footer', true);
+        $showComputerGenFooter = $document->show_computer_generated_footer ?? $companyFooterDefault;
         $brandingPaths = [
             'logo' => $company?->logo_path,
             'signature' => $company?->signature_path,
