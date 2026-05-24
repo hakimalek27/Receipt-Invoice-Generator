@@ -77,6 +77,8 @@ class DocumentWorkflowService
                 'terms' => $data['terms'] ?? null,
                 'product_line' => $data['product_line'] ?? null,
                 'include_arabic_salutation' => $data['include_arabic_salutation'] ?? false,
+                // Tri-state per-doc override (null = inherit company; true = show; false = hide).
+                'show_computer_generated_footer' => $data['show_computer_generated_footer'] ?? null,
                 'show_amount_in_words' => $data['show_amount_in_words'] ?? false,
                 'amount_in_words_locale' => $data['amount_in_words_locale'] ?? null,
                 'amount_in_words_currency' => $data['amount_in_words_currency'] ?? null,
