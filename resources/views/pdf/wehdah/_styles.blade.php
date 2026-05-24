@@ -63,6 +63,7 @@ body {
     vertical-align: middle;
     text-align: center;
     line-height: 1.25;
+    margin-left: -2cm;
 }
 
 /* ============ Company identity block (centered) ============ */
