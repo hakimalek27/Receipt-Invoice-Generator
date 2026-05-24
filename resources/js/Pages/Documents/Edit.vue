@@ -107,6 +107,10 @@ const convertTarget = ref(availableConvertTargets.value[0] ?? 'invoice');
 const voidReason = ref('');
 
 const isDraft = computed(() => form.status === 'draft');
+// Allow edits on both drafts and issued docs so typos / amount fixes can be
+// corrected after the fact. Terminal states (void / cancelled / converted)
+// stay locked.
+const canEdit = computed(() => ['draft', 'issued'].includes(form.status));
 const companyFooterDefaultLabel = computed(() => {
     const value = props.company?.settings?.show_computer_generated_footer ?? true;
     return value ? 'ON' : 'OFF';
@@ -507,7 +511,7 @@ async function convertDocument() {
                     <button class="rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-50" :disabled="busy || !form.id" @click="previewPdf('a4')">Preview A4</button>
                     <button class="rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-50" :disabled="busy || !form.id" @click="previewPdf('60mm')">60mm</button>
                     <button v-if="form.id" class="rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-50" :disabled="busy" @click="duplicateThisDocument" title="Clone as new draft">Duplicate</button>
-                    <button class="rounded-lg bg-gray-900 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-800 disabled:opacity-50" :disabled="busy || !isDraft" @click="saveDraft">Save Draft</button>
+                    <button class="rounded-lg bg-gray-900 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-800 disabled:opacity-50" :disabled="busy || !canEdit" @click="saveDraft">{{ isDraft ? 'Save Draft' : 'Save Changes' }}</button>
                     <button class="rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50" :disabled="busy || !isDraft || !form.id" @click="openIssue">Issue</button>
                 </div>
             </div>
@@ -518,6 +522,10 @@ async function convertDocument() {
                 <section class="min-w-0 space-y-5">
                     <div v-if="message" class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 shadow-sm">{{ message }}</div>
                     <div v-if="error" class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800 shadow-sm">{{ error }}</div>
+                    <div v-if="form.status === 'issued'" class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm">
+                        <span class="font-semibold">Editing an issued document.</span>
+                        Any changes you save will update the PDF the customer sees. The original at-issue snapshot is replaced.
+                    </div>
 
                     <div v-if="document?.converted_from || (document?.converted_to?.length)"
                          class="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
@@ -590,13 +598,13 @@ async function convertDocument() {
                         <div class="grid gap-4 md:grid-cols-4">
                             <label class="text-sm font-medium text-gray-700">
                                 Type
-                                <select v-model="form.document_type" :disabled="!isDraft" class="mt-1 w-full rounded-md border-gray-300 text-sm">
+                                <select v-model="form.document_type" :disabled="!canEdit" class="mt-1 w-full rounded-md border-gray-300 text-sm">
                                     <option v-for="type in documentTypes" :key="type" :value="type">{{ type }}</option>
                                 </select>
                             </label>
                             <label class="text-sm font-medium text-gray-700">
                                 Customer
-                                <input v-model="form.customer_name" :disabled="!isDraft"
+                                <input v-model="form.customer_name" :disabled="!canEdit"
                                        list="customer-options"
                                        @change="customerAutofill"
                                        @blur="customerAutofill"
@@ -605,11 +613,11 @@ async function convertDocument() {
                             </label>
                             <label class="text-sm font-medium text-gray-700">
                                 Date
-                                <input v-model="form.document_date" :disabled="!isDraft" type="date" class="mt-1 w-full rounded-md border-gray-300 text-sm">
+                                <input v-model="form.document_date" :disabled="!canEdit" type="date" class="mt-1 w-full rounded-md border-gray-300 text-sm">
                             </label>
                             <label class="text-sm font-medium text-gray-700">
                                 Due / Valid Until
-                                <input v-model="form.due_date" :disabled="!isDraft" type="date" class="mt-1 w-full rounded-md border-gray-300 text-sm">
+                                <input v-model="form.due_date" :disabled="!canEdit" type="date" class="mt-1 w-full rounded-md border-gray-300 text-sm">
                             </label>
                         </div>
                         <div class="mt-5 rounded-xl border border-gray-100 bg-gray-50/70 p-4" v-if="form.customer_name">
@@ -620,38 +628,38 @@ async function convertDocument() {
                             <div class="grid gap-3 md:grid-cols-2">
                                 <label class="text-xs font-medium text-gray-700">
                                     Attn
-                                    <input v-model="form.customer_attention_to" :disabled="!isDraft" class="mt-1 w-full rounded-md border-gray-300 text-sm" placeholder="Attention to">
+                                    <input v-model="form.customer_attention_to" :disabled="!canEdit" class="mt-1 w-full rounded-md border-gray-300 text-sm" placeholder="Attention to">
                                 </label>
                                 <label class="text-xs font-medium text-gray-700">
                                     Tel
-                                    <input v-model="form.customer_phone" :disabled="!isDraft" class="mt-1 w-full rounded-md border-gray-300 text-sm" placeholder="Phone">
+                                    <input v-model="form.customer_phone" :disabled="!canEdit" class="mt-1 w-full rounded-md border-gray-300 text-sm" placeholder="Phone">
                                 </label>
                                 <label class="text-xs font-medium text-gray-700 md:col-span-2">
                                     Email
-                                    <input v-model="form.customer_email" :disabled="!isDraft" type="email" class="mt-1 w-full rounded-md border-gray-300 text-sm" placeholder="Email">
+                                    <input v-model="form.customer_email" :disabled="!canEdit" type="email" class="mt-1 w-full rounded-md border-gray-300 text-sm" placeholder="Email">
                                 </label>
                                 <label class="text-xs font-medium text-gray-700 md:col-span-2">
                                     Address
-                                    <textarea v-model="form.customer_address" :disabled="!isDraft" rows="2" class="mt-1 w-full rounded-md border-gray-300 text-sm" placeholder="Multi-line address (renders verbatim in PDF)" />
+                                    <textarea v-model="form.customer_address" :disabled="!canEdit" rows="2" class="mt-1 w-full rounded-md border-gray-300 text-sm" placeholder="Multi-line address (renders verbatim in PDF)" />
                                 </label>
                             </div>
                         </div>
                         <div class="mt-4 grid gap-4 md:grid-cols-4">
                             <label class="text-sm font-medium text-gray-700">
                                 Currency
-                                <input v-model="form.currency" :disabled="!isDraft" class="mt-1 w-full rounded-md border-gray-300 text-sm">
+                                <input v-model="form.currency" :disabled="!canEdit" class="mt-1 w-full rounded-md border-gray-300 text-sm">
                             </label>
                             <label class="text-sm font-medium text-gray-700">
                                 FX Rate
-                                <input v-model="form.fx_rate" :disabled="!isDraft" type="number" step="0.00000001" class="mt-1 w-full rounded-md border-gray-300 text-sm">
+                                <input v-model="form.fx_rate" :disabled="!canEdit" type="number" step="0.00000001" class="mt-1 w-full rounded-md border-gray-300 text-sm">
                             </label>
                             <label class="flex items-center gap-2 pt-6 text-sm font-medium text-gray-700">
-                                <input v-model="form.show_amount_in_words" :disabled="!isDraft" type="checkbox" class="rounded border-gray-300">
+                                <input v-model="form.show_amount_in_words" :disabled="!canEdit" type="checkbox" class="rounded border-gray-300">
                                 Amount in words
                             </label>
                             <label class="text-sm font-medium text-gray-700">
                                 Words Locale
-                                <select v-model="form.amount_in_words_locale" :disabled="!isDraft" class="mt-1 w-full rounded-md border-gray-300 text-sm">
+                                <select v-model="form.amount_in_words_locale" :disabled="!canEdit" class="mt-1 w-full rounded-md border-gray-300 text-sm">
                                     <option value="ms_MY">Malay</option>
                                     <option value="en_MY">English</option>
                                 </select>
@@ -660,7 +668,7 @@ async function convertDocument() {
                         <div class="mt-4 grid gap-4 md:grid-cols-2">
                             <label class="text-sm font-medium text-gray-700">
                                 "Computer-generated document" footer
-                                <select v-model="form.show_computer_generated_footer" :disabled="!isDraft" class="mt-1 w-full rounded-md border-gray-300 text-sm">
+                                <select v-model="form.show_computer_generated_footer" :disabled="!canEdit" class="mt-1 w-full rounded-md border-gray-300 text-sm">
                                     <option :value="null">Inherit (Company default: {{ companyFooterDefaultLabel }})</option>
                                     <option :value="true">Always show</option>
                                     <option :value="false">Always hide</option>
@@ -671,14 +679,14 @@ async function convertDocument() {
                         <div v-if="isPgg" class="mt-4 grid gap-4 rounded-md border border-indigo-100 bg-indigo-50 p-4 md:grid-cols-2">
                             <label class="text-sm font-medium text-indigo-900">
                                 Product Line
-                                <select v-model="form.product_line" :disabled="!isDraft" class="mt-1 w-full rounded-md border-indigo-200 text-sm">
+                                <select v-model="form.product_line" :disabled="!canEdit" class="mt-1 w-full rounded-md border-indigo-200 text-sm">
                                     <option value="">Standard</option>
                                     <option value="scentury">SCENTURY</option>
                                 </select>
                                 <span class="mt-1 block text-xs text-indigo-700">SCENTURY: gold accent + sub-line "SCENTURY by Persada".</span>
                             </label>
                             <label class="flex items-start gap-2 pt-6 text-sm font-medium text-indigo-900">
-                                <input v-model="form.include_arabic_salutation" :disabled="!isDraft" type="checkbox" class="mt-0.5 rounded border-indigo-300">
+                                <input v-model="form.include_arabic_salutation" :disabled="!canEdit" type="checkbox" class="mt-0.5 rounded border-indigo-300">
                                 <span>
                                     Include Arabic Salutation
                                     <span class="mt-0.5 block text-xs font-normal text-indigo-700">Renders Bismillah + Assalamualaikum block atop page 1.</span>
@@ -693,22 +701,22 @@ async function convertDocument() {
                                 <h3 class="text-base font-semibold tracking-tight text-gray-900">Line Items</h3>
                                 <p class="mt-0.5 text-xs text-gray-500">{{ form.items.length }} {{ form.items.length === 1 ? 'item' : 'items' }}</p>
                             </div>
-                            <button class="rounded-lg border border-gray-200 bg-white px-3.5 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-50" :disabled="!isDraft" @click="addItem">+ Add Item</button>
+                            <button class="rounded-lg border border-gray-200 bg-white px-3.5 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-50" :disabled="!canEdit" @click="addItem">+ Add Item</button>
                         </div>
                         <div class="divide-y divide-gray-100">
                             <div v-for="(item, index) in form.items" :key="index" class="px-6 py-5 transition hover:bg-gray-50/40">
                                 <div class="flex items-center justify-between text-xs font-semibold tracking-wide text-gray-400">
                                     <span class="uppercase">Item {{ index + 1 }}</span>
-                                    <button class="rounded-md px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-30" :disabled="!isDraft || form.items.length === 1" @click="removeItem(index)">Remove</button>
+                                    <button class="rounded-md px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-30" :disabled="!canEdit || form.items.length === 1" @click="removeItem(index)">Remove</button>
                                 </div>
 
-                                <input v-model="item.section_header" :disabled="!isDraft"
+                                <input v-model="item.section_header" :disabled="!canEdit"
                                        class="mt-2 w-full rounded-lg border-amber-200 bg-amber-50/60 text-xs placeholder:text-amber-700/60"
                                        placeholder="Section heading (e.g. Bilik Muaazzin) — optional">
 
                                 <div class="mt-3 grid gap-3 lg:grid-cols-[1fr_auto] lg:items-start">
                                     <div class="space-y-2 min-w-0">
-                                        <input v-model="item.product_name" :disabled="!isDraft"
+                                        <input v-model="item.product_name" :disabled="!canEdit"
                                                :list="`product-options-${index}`"
                                                @change="productAutofill(index)"
                                                class="w-full rounded-lg border-gray-300 text-sm"
@@ -716,7 +724,7 @@ async function convertDocument() {
                                         <datalist :id="`product-options-${index}`">
                                             <option v-for="product in products" :key="product.id" :value="product.name"></option>
                                         </datalist>
-                                        <textarea v-model="item.description" :disabled="!isDraft" rows="2" class="w-full rounded-lg border-gray-300 text-sm" placeholder="Item description"></textarea>
+                                        <textarea v-model="item.description" :disabled="!canEdit" rows="2" class="w-full rounded-lg border-gray-300 text-sm" placeholder="Item description"></textarea>
                                     </div>
                                     <div class="rounded-xl bg-gray-50 px-5 py-3 text-right lg:min-w-[180px]">
                                         <div class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Line Total</div>
@@ -730,30 +738,30 @@ async function convertDocument() {
                                 <div class="mt-3 grid gap-2 grid-cols-2 sm:grid-cols-3" :class="isAdmin ? 'lg:grid-cols-6' : 'lg:grid-cols-5'">
                                     <label class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
                                         Qty
-                                        <input v-model.number="item.quantity" :disabled="!isDraft" type="number" step="0.0001" class="mt-1 w-full rounded-lg border-gray-300 text-sm">
+                                        <input v-model.number="item.quantity" :disabled="!canEdit" type="number" step="0.0001" class="mt-1 w-full rounded-lg border-gray-300 text-sm">
                                     </label>
                                     <label class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
                                         UOM
-                                        <input v-model="item.uom" list="uom-options" :disabled="!isDraft" class="mt-1 w-full rounded-lg border-gray-300 text-sm" placeholder="unit, pcs, set, helai...">
+                                        <input v-model="item.uom" list="uom-options" :disabled="!canEdit" class="mt-1 w-full rounded-lg border-gray-300 text-sm" placeholder="unit, pcs, set, helai...">
                                     </label>
                                     <label class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
                                         Harga
-                                        <input v-model.number="item.unit_price" :disabled="!isDraft || !canPrice" type="number" step="0.01" class="mt-1 w-full rounded-lg border-gray-300 text-sm">
+                                        <input v-model.number="item.unit_price" :disabled="!canEdit || !canPrice" type="number" step="0.01" class="mt-1 w-full rounded-lg border-gray-300 text-sm">
                                     </label>
                                     <label class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
                                         Discount
-                                        <input v-model.number="item.discount" :disabled="!isDraft || !canPrice" type="number" step="0.01" class="mt-1 w-full rounded-lg border-gray-300 text-sm">
+                                        <input v-model.number="item.discount" :disabled="!canEdit || !canPrice" type="number" step="0.01" class="mt-1 w-full rounded-lg border-gray-300 text-sm">
                                     </label>
                                     <label class="text-[11px] font-semibold uppercase tracking-wide text-gray-500" title="Tax type and amount">
                                         Tax
                                         <div class="mt-1 flex gap-1">
-                                            <input v-model="item.tax_type" :disabled="!isDraft || !canPrice" class="w-1/2 min-w-0 rounded-lg border-gray-300 text-sm" placeholder="SST">
-                                            <input v-model.number="item.tax_amount" :disabled="!isDraft || !canPrice" type="number" step="0.01" class="w-1/2 min-w-0 rounded-lg border-gray-300 text-sm" placeholder="0.00">
+                                            <input v-model="item.tax_type" :disabled="!canEdit || !canPrice" class="w-1/2 min-w-0 rounded-lg border-gray-300 text-sm" placeholder="SST">
+                                            <input v-model.number="item.tax_amount" :disabled="!canEdit || !canPrice" type="number" step="0.01" class="w-1/2 min-w-0 rounded-lg border-gray-300 text-sm" placeholder="0.00">
                                         </div>
                                     </label>
                                     <label v-if="isAdmin" class="text-[11px] font-semibold uppercase tracking-wide text-amber-700" title="Internal cost per unit (admin only, not in PDF)">
                                         Cost
-                                        <input v-model.number="item.cost_unit" :disabled="!isDraft || !canPrice" type="number" step="0.01" class="mt-1 w-full rounded-lg border-amber-200 bg-amber-50 text-sm" placeholder="optional">
+                                        <input v-model.number="item.cost_unit" :disabled="!canEdit || !canPrice" type="number" step="0.01" class="mt-1 w-full rounded-lg border-amber-200 bg-amber-50 text-sm" placeholder="optional">
                                     </label>
                                 </div>
 
@@ -762,7 +770,7 @@ async function convertDocument() {
                                         <span class="group-open:hidden">+ Image data URI (optional)</span>
                                         <span class="hidden group-open:inline">− Hide image URI</span>
                                     </summary>
-                                    <input v-model="item.image_url" :disabled="!isDraft"
+                                    <input v-model="item.image_url" :disabled="!canEdit"
                                            class="mt-2 w-full rounded-lg border-gray-300 font-mono text-xs"
                                            placeholder="data:image/png;base64,...">
                                 </details>
@@ -776,11 +784,11 @@ async function convertDocument() {
                     <div class="grid gap-5 lg:grid-cols-2">
                         <div class="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm">
                             <label class="text-sm font-semibold tracking-tight text-gray-900">Terms</label>
-                            <textarea v-model="form.terms" :disabled="!isDraft" rows="4" class="mt-2 w-full rounded-lg border-gray-300 text-sm"></textarea>
+                            <textarea v-model="form.terms" :disabled="!canEdit" rows="4" class="mt-2 w-full rounded-lg border-gray-300 text-sm"></textarea>
                         </div>
                         <div class="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm">
                             <label class="text-sm font-semibold tracking-tight text-gray-900">Notes</label>
-                            <textarea v-model="form.notes" :disabled="!isDraft" rows="4" class="mt-2 w-full rounded-lg border-gray-300 text-sm"></textarea>
+                            <textarea v-model="form.notes" :disabled="!canEdit" rows="4" class="mt-2 w-full rounded-lg border-gray-300 text-sm"></textarea>
                         </div>
                     </div>
 
@@ -790,9 +798,9 @@ async function convertDocument() {
                             <span class="text-xs text-gray-500">JPG/PNG/WEBP/PDF · max 10 MB per file</span>
                         </div>
                         <div class="mt-4 grid gap-3 md:grid-cols-[1fr_220px_auto]">
-                            <input type="file" multiple accept=".jpg,.jpeg,.png,.webp,.pdf" :disabled="!isDraft" class="rounded-md border border-gray-300 px-3 py-2 text-sm" @change="artworkFiles = Array.from($event.target.files)">
-                            <input v-model="artworkCaption" :disabled="!isDraft" class="rounded-md border-gray-300 text-sm" placeholder="Caption (prefix; #N appended for multi-upload)">
-                            <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 disabled:opacity-50" :disabled="busy || !isDraft || artworkFiles.length === 0" @click="uploadArtwork">Upload {{ artworkFiles.length > 1 ? `(${artworkFiles.length})` : '' }}</button>
+                            <input type="file" multiple accept=".jpg,.jpeg,.png,.webp,.pdf" :disabled="!canEdit" class="rounded-md border border-gray-300 px-3 py-2 text-sm" @change="artworkFiles = Array.from($event.target.files)">
+                            <input v-model="artworkCaption" :disabled="!canEdit" class="rounded-md border-gray-300 text-sm" placeholder="Caption (prefix; #N appended for multi-upload)">
+                            <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 disabled:opacity-50" :disabled="busy || !canEdit || artworkFiles.length === 0" @click="uploadArtwork">Upload {{ artworkFiles.length > 1 ? `(${artworkFiles.length})` : '' }}</button>
                         </div>
                         <div v-if="artworkFiles.length > 0" class="mt-2 text-xs text-gray-600">
                             Selected: {{ artworkFiles.map((f) => `${f.name} (${(f.size / 1024 / 1024).toFixed(2)} MB)`).join(', ') }}
@@ -801,11 +809,11 @@ async function convertDocument() {
                             <div v-for="(attachment, index) in form.attachments" :key="attachment.id"
                                  class="flex items-center justify-between gap-3 py-2 transition"
                                  :class="{
-                                     'cursor-move': isDraft,
+                                     'cursor-move': canEdit,
                                      'opacity-40': draggedAttachmentIndex === index,
                                      'border-y-2 border-indigo-400 bg-indigo-50': draggedAttachmentIndex !== null && draggedAttachmentIndex !== index,
                                  }"
-                                 :draggable="isDraft && !busy"
+                                 :draggable="canEdit && !busy"
                                  @dragstart="onAttachmentDragStart(index)"
                                  @dragover.prevent
                                  @drop.prevent="onAttachmentDrop(index)"
@@ -818,9 +826,9 @@ async function convertDocument() {
                                     <span v-if="attachment.size_bytes" class="text-xs text-gray-400">· {{ (attachment.size_bytes / 1024).toFixed(0) }} KB</span>
                                 </div>
                                 <div class="flex shrink-0 items-center gap-1">
-                                    <button :disabled="!isDraft || busy || index === 0" @click="moveAttachment(index, -1)" class="rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 disabled:opacity-30" title="Move up">↑</button>
-                                    <button :disabled="!isDraft || busy || index === form.attachments.length - 1" @click="moveAttachment(index, 1)" class="rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 disabled:opacity-30" title="Move down">↓</button>
-                                    <button :disabled="!isDraft || busy" @click="removeAttachment(attachment.id)" class="rounded border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 disabled:opacity-30">Remove</button>
+                                    <button :disabled="!canEdit || busy || index === 0" @click="moveAttachment(index, -1)" class="rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 disabled:opacity-30" title="Move up">↑</button>
+                                    <button :disabled="!canEdit || busy || index === form.attachments.length - 1" @click="moveAttachment(index, 1)" class="rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 disabled:opacity-30" title="Move down">↓</button>
+                                    <button :disabled="!canEdit || busy" @click="removeAttachment(attachment.id)" class="rounded border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 disabled:opacity-30">Remove</button>
                                 </div>
                             </div>
                             <div v-if="form.attachments.length === 0" class="py-4 text-gray-500">No artwork uploaded.</div>

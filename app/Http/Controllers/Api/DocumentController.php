@@ -180,8 +180,11 @@ class DocumentController extends Controller
             && ! $request->user()->isSuperAdmin()) {
             return response()->json(['error' => 'Company scope violation'], 403);
         }
-        if (! $document->isDraft()) {
-            return response()->json(['error' => 'Only draft documents can be updated'], 422);
+        // Draft and issued documents are both editable so admins can correct
+        // typos / numbers after issue. Terminal states (void / cancelled /
+        // converted) stay locked.
+        if (! in_array($document->status, [Document::STATUS_DRAFT, Document::STATUS_ISSUED], true)) {
+            return response()->json(['error' => 'Documents in '.$document->status.' status cannot be edited'], 422);
         }
 
         $data = $request->validate([
@@ -242,6 +245,8 @@ class DocumentController extends Controller
 
         try {
             DB::transaction(function () use ($document, $data) {
+                $wasIssued = $document->isIssued();
+
                 $document->update(collect($data)->except('items')->all());
 
                 if (array_key_exists('items', $data)) {
@@ -253,6 +258,21 @@ class DocumentController extends Controller
 
                 $document->load('items');
                 $document->recomputeTotals();
+
+                if ($wasIssued) {
+                    // The frozen-at-issue snapshots would otherwise hide this
+                    // edit from the PDF. Null them so the renderer falls back
+                    // to live company/customer/etc. Then mark existing cached
+                    // PDFs as not-current so the next preview regenerates.
+                    $document->issuer_snapshot_json = null;
+                    $document->buyer_snapshot_json = null;
+                    $document->bank_snapshot_json = null;
+                    $document->terms_snapshot_json = null;
+                    $document->tax_snapshot_json = null;
+                    $document->currency_fx_snapshot_json = null;
+                    $document->pdfRenders()->update(['is_current' => false]);
+                }
+
                 $document->save();
                 $document->draft_hash = $this->fingerprint->hash($document);
                 $document->save();
