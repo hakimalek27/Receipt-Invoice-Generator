@@ -40,11 +40,10 @@ body {
     text-underline-offset: 3px;
 }
 
-/* ============ Header row: 3-col table (logo | text | spacer) ============
-   Left and right cells are the same width so the middle text cell
-   centers on the page even though the logo sits in the left cell.
-   Border-bottom on the table itself; the inner .ws-company-block's
-   own border is suppressed to avoid a double line. */
+/* ============ Header row: 2-col table (logo | text) ============
+   Logo sits in a fixed-width left cell; text takes the remaining
+   width and is centered within ITSELF (not page-centered). Border
+   on the table; inner .ws-company-block's own border suppressed. */
 .ws-header-table {
     width: 100%;
     border-collapse: collapse;
@@ -65,10 +64,7 @@ body {
 .ws-header-text-cell {
     vertical-align: middle;
     text-align: center;
-    padding: 4px 0;
-}
-.ws-header-spacer {
-    width: 6cm;
+    padding: 4px 4px 4px 0;
 }
 .ws-header-text-cell .ws-company-block {
     border-bottom: none;
