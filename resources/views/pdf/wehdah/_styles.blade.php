@@ -40,13 +40,12 @@ body {
     text-underline-offset: 3px;
 }
 
-/* ============ Header: logo + info as an inline-block group ============
-   Wrapper has text-align: center, so the two inline-block siblings
-   (logo img + .ws-header-info) are centered on the page as ONE unit.
-   The info div's text-align: center centers the multi-line text
-   within itself. */
+/* ============ Header: logo at 1.6cm offset + info beside it ============
+   Logo is anchored 1.6cm in from the page-content edge via its own
+   margin-left. Info follows as an inline-block sibling with a small
+   gap. The whole group sits left of page-center; info's text-align
+   keeps the multi-line text centered within the info block itself. */
 .ws-header-center {
-    text-align: center;
     border-bottom: 1px solid #cccccc;
     margin: 4px 0 4px;
     padding: 4px 0;
@@ -56,6 +55,7 @@ body {
     vertical-align: middle;
     max-width: 152px;
     max-height: 144px;
+    margin-left: 1.6cm;
     margin-right: 12px;
 }
 .ws-header-info {
