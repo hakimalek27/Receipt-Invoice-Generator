@@ -111,6 +111,17 @@ const isDraft = computed(() => form.status === 'draft');
 // corrected after the fact. Terminal states (void / cancelled / converted)
 // stay locked.
 const canEdit = computed(() => ['draft', 'issued'].includes(form.status));
+
+// Predefined unit list for the per-item UOM dropdown (mix EN + MS, ordered
+// by frequency in invoicing).
+const UOM_OPTIONS = [
+    'unit', 'pcs', 'pc', 'set', 'pair', 'pasang', 'dozen',
+    'box', 'kotak', 'carton', 'ctn', 'karton',
+    'pack', 'pek', 'pkt', 'bundle', 'roll', 'gulung',
+    'sheet', 'helai', 'keping', 'biji', 'lot', 'l/s',
+    'm', 'cm', 'kg', 'g', 'liter', 'ml',
+    'hour', 'jam', 'day', 'hari', 'month', 'bulan', 'year', 'tahun',
+];
 const companyFooterDefaultLabel = computed(() => {
     const value = props.company?.settings?.show_computer_generated_footer ?? true;
     return value ? 'ON' : 'OFF';
@@ -553,46 +564,6 @@ async function convertDocument() {
                         <option v-for="c in customers" :key="c.id" :value="c.name"></option>
                     </datalist>
 
-                    <datalist id="uom-options">
-                        <option value="unit"></option>
-                        <option value="pcs"></option>
-                        <option value="pc"></option>
-                        <option value="set"></option>
-                        <option value="pair"></option>
-                        <option value="pasang"></option>
-                        <option value="dozen"></option>
-                        <option value="box"></option>
-                        <option value="kotak"></option>
-                        <option value="carton"></option>
-                        <option value="ctn"></option>
-                        <option value="karton"></option>
-                        <option value="pack"></option>
-                        <option value="pek"></option>
-                        <option value="pkt"></option>
-                        <option value="bundle"></option>
-                        <option value="roll"></option>
-                        <option value="gulung"></option>
-                        <option value="sheet"></option>
-                        <option value="helai"></option>
-                        <option value="keping"></option>
-                        <option value="biji"></option>
-                        <option value="lot"></option>
-                        <option value="l/s"></option>
-                        <option value="m"></option>
-                        <option value="cm"></option>
-                        <option value="kg"></option>
-                        <option value="g"></option>
-                        <option value="liter"></option>
-                        <option value="ml"></option>
-                        <option value="hour"></option>
-                        <option value="jam"></option>
-                        <option value="day"></option>
-                        <option value="hari"></option>
-                        <option value="month"></option>
-                        <option value="bulan"></option>
-                        <option value="year"></option>
-                        <option value="tahun"></option>
-                    </datalist>
 
                     <div class="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm">
                         <div class="grid gap-4 md:grid-cols-4">
@@ -742,10 +713,13 @@ async function convertDocument() {
                                     </label>
                                     <label class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
                                         UOM
-                                        <input v-model="item.uom" list="uom-options" :disabled="!canEdit" class="mt-1 w-full rounded-lg border-gray-300 text-sm" placeholder="unit, pcs, set, helai...">
+                                        <select v-model="item.uom" :disabled="!canEdit" class="mt-1 w-full rounded-lg border-gray-300 text-sm">
+                                            <option v-if="item.uom && !UOM_OPTIONS.includes(item.uom)" :value="item.uom">{{ item.uom }} (custom)</option>
+                                            <option v-for="u in UOM_OPTIONS" :key="u" :value="u">{{ u }}</option>
+                                        </select>
                                     </label>
                                     <label class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                                        Harga
+                                        Price
                                         <input v-model.number="item.unit_price" :disabled="!canEdit || !canPrice" type="number" step="0.01" class="mt-1 w-full rounded-lg border-gray-300 text-sm">
                                     </label>
                                     <label class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
