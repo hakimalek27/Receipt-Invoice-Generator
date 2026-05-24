@@ -545,6 +545,47 @@ async function convertDocument() {
                         <option v-for="c in customers" :key="c.id" :value="c.name"></option>
                     </datalist>
 
+                    <datalist id="uom-options">
+                        <option value="unit"></option>
+                        <option value="pcs"></option>
+                        <option value="pc"></option>
+                        <option value="set"></option>
+                        <option value="pair"></option>
+                        <option value="pasang"></option>
+                        <option value="dozen"></option>
+                        <option value="box"></option>
+                        <option value="kotak"></option>
+                        <option value="carton"></option>
+                        <option value="ctn"></option>
+                        <option value="karton"></option>
+                        <option value="pack"></option>
+                        <option value="pek"></option>
+                        <option value="pkt"></option>
+                        <option value="bundle"></option>
+                        <option value="roll"></option>
+                        <option value="gulung"></option>
+                        <option value="sheet"></option>
+                        <option value="helai"></option>
+                        <option value="keping"></option>
+                        <option value="biji"></option>
+                        <option value="lot"></option>
+                        <option value="l/s"></option>
+                        <option value="m"></option>
+                        <option value="cm"></option>
+                        <option value="kg"></option>
+                        <option value="g"></option>
+                        <option value="liter"></option>
+                        <option value="ml"></option>
+                        <option value="hour"></option>
+                        <option value="jam"></option>
+                        <option value="day"></option>
+                        <option value="hari"></option>
+                        <option value="month"></option>
+                        <option value="bulan"></option>
+                        <option value="year"></option>
+                        <option value="tahun"></option>
+                    </datalist>
+
                     <div class="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm">
                         <div class="grid gap-4 md:grid-cols-4">
                             <label class="text-sm font-medium text-gray-700">
@@ -693,10 +734,10 @@ async function convertDocument() {
                                     </label>
                                     <label class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
                                         UOM
-                                        <input v-model="item.uom" :disabled="!isDraft" class="mt-1 w-full rounded-lg border-gray-300 text-sm">
+                                        <input v-model="item.uom" list="uom-options" :disabled="!isDraft" class="mt-1 w-full rounded-lg border-gray-300 text-sm" placeholder="unit, pcs, set, helai...">
                                     </label>
                                     <label class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                                        Rate
+                                        Harga
                                         <input v-model.number="item.unit_price" :disabled="!isDraft || !canPrice" type="number" step="0.01" class="mt-1 w-full rounded-lg border-gray-300 text-sm">
                                     </label>
                                     <label class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
