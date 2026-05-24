@@ -126,6 +126,9 @@ function applyDocument(document) {
     form.grand_total = Number(document.grand_total ?? grandTotal.value);
     form.attachments = document.attachments ?? form.attachments;
     form.pdf_renders = document.pdf_renders ?? form.pdf_renders;
+    // Reflect server-truth for the tri-state override so the dropdown
+    // matches the actual saved value (null = inherit).
+    form.show_computer_generated_footer = document.show_computer_generated_footer ?? null;
 }
 
 function addItem() {
