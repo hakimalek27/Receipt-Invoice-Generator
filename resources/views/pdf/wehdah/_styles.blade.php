@@ -40,36 +40,29 @@ body {
     text-underline-offset: 3px;
 }
 
-/* ============ Header row: 2-col table (logo | text) ============
-   Logo sits in a fixed-width left cell; text takes the remaining
-   width and is centered within ITSELF (not page-centered). Border
-   on the table; inner .ws-company-block's own border suppressed. */
-.ws-header-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 4px 0 4px;
+/* ============ Header: logo + info as an inline-block group ============
+   Wrapper has text-align: center, so the two inline-block siblings
+   (logo img + .ws-header-info) are centered on the page as ONE unit.
+   The info div's text-align: center centers the multi-line text
+   within itself. */
+.ws-header-center {
+    text-align: center;
     border-bottom: 1px solid #cccccc;
-}
-.ws-header-logo-cell {
-    width: 6cm;
-    vertical-align: middle;
-    padding: 4px 4px 4px 1.6cm;   /* 1.6cm logo offset from page-content edge */
-    text-align: left;
+    margin: 4px 0 4px;
+    padding: 4px 0;
 }
 .ws-header-logo-img {
+    display: inline-block;
+    vertical-align: middle;
     max-width: 152px;
     max-height: 144px;
-    display: inline-block;
+    margin-right: 12px;
 }
-.ws-header-text-cell {
+.ws-header-info {
+    display: inline-block;
     vertical-align: middle;
     text-align: center;
-    padding: 4px 4px 4px 0;
-}
-.ws-header-text-cell .ws-company-block {
-    border-bottom: none;
-    margin-bottom: 0;
-    padding-bottom: 0;
+    line-height: 1.25;
 }
 
 /* ============ Company identity block (centered) ============ */
