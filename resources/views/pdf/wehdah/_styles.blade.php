@@ -40,23 +40,37 @@ body {
     text-underline-offset: 3px;
 }
 
-/* ============ Header wrap: full-width centered text + absolute logo ============ */
-.ws-header-wrap {
-    position: relative;
+/* ============ Header row: 3-col table (logo | text | spacer) ============
+   Left and right cells are the same width so the middle text cell
+   centers on the page even though the logo sits in the left cell.
+   Border-bottom on the table itself; the inner .ws-company-block's
+   own border is suppressed to avoid a double line. */
+.ws-header-table {
+    width: 100%;
+    border-collapse: collapse;
     margin: 4px 0 4px;
-    padding: 4px 0 3px;
     border-bottom: 1px solid #cccccc;
-    min-height: 160px;
 }
-.ws-header-logo-abs {
-    position: absolute;
-    left: 1.6cm;
-    top: -0.2cm;
+.ws-header-logo-cell {
+    width: 6cm;
+    vertical-align: middle;
+    padding: 4px 4px 4px 1.6cm;   /* 1.6cm logo offset from page-content edge */
+    text-align: left;
+}
+.ws-header-logo-img {
     max-width: 152px;
     max-height: 144px;
+    display: inline-block;
 }
-/* When header-wrap encloses company-block, the wrap owns the divider line. */
-.ws-header-wrap .ws-company-block {
+.ws-header-text-cell {
+    vertical-align: middle;
+    text-align: center;
+    padding: 4px 0;
+}
+.ws-header-spacer {
+    width: 6cm;
+}
+.ws-header-text-cell .ws-company-block {
     border-bottom: none;
     margin-bottom: 0;
     padding-bottom: 0;
