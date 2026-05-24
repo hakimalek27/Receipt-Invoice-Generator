@@ -493,28 +493,28 @@ async function convertDocument() {
     <AuthenticatedLayout>
         <template #header>
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h2 class="text-xl font-semibold leading-tight text-gray-900">
+                <div class="min-w-0">
+                    <h2 class="text-2xl font-semibold leading-tight tracking-tight text-gray-900">
                         {{ form.official_number || (form.id ? `Draft #${form.id}` : 'New Draft') }}
                     </h2>
-                    <p class="mt-1 text-sm text-gray-500">{{ form.document_type }} · {{ form.status }}</p>
+                    <p class="mt-1 text-sm capitalize text-gray-500">{{ form.document_type.replace('_', ' ') }} · {{ form.status }}</p>
                 </div>
-                <div class="flex flex-wrap gap-2">
-                    <Link :href="route('documents.index')" class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700">Back</Link>
-                    <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" :disabled="busy || !form.id" @click="previewPdf('a4')">Preview A4</button>
-                    <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" :disabled="busy || !form.id" @click="previewPdf('60mm')">60mm</button>
-                    <button v-if="form.id" class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" :disabled="busy" @click="duplicateThisDocument" title="Clone as new draft">Duplicate</button>
-                    <button class="rounded-md bg-gray-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="busy || !isDraft" @click="saveDraft">Save Draft</button>
-                    <button class="rounded-md bg-emerald-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="busy || !isDraft || !form.id" @click="openIssue">Issue</button>
+                <div class="flex flex-wrap items-center gap-2">
+                    <Link :href="route('documents.index')" class="rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">Back</Link>
+                    <button class="rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-50" :disabled="busy || !form.id" @click="previewPdf('a4')">Preview A4</button>
+                    <button class="rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-50" :disabled="busy || !form.id" @click="previewPdf('60mm')">60mm</button>
+                    <button v-if="form.id" class="rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-50" :disabled="busy" @click="duplicateThisDocument" title="Clone as new draft">Duplicate</button>
+                    <button class="rounded-lg bg-gray-900 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-800 disabled:opacity-50" :disabled="busy || !isDraft" @click="saveDraft">Save Draft</button>
+                    <button class="rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50" :disabled="busy || !isDraft || !form.id" @click="openIssue">Issue</button>
                 </div>
             </div>
         </template>
 
-        <div class="py-6">
-            <div class="mx-auto grid max-w-7xl gap-6 px-4 lg:grid-cols-[1fr_320px] lg:px-8">
-                <section class="space-y-5">
-                    <div v-if="message" class="rounded border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{{ message }}</div>
-                    <div v-if="error" class="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{ error }}</div>
+        <div class="py-8">
+            <div class="mx-auto grid max-w-7xl gap-6 px-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:px-8">
+                <section class="min-w-0 space-y-5">
+                    <div v-if="message" class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 shadow-sm">{{ message }}</div>
+                    <div v-if="error" class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800 shadow-sm">{{ error }}</div>
 
                     <div v-if="document?.converted_from || (document?.converted_to?.length)"
                          class="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
@@ -542,7 +542,7 @@ async function convertDocument() {
                         <option v-for="c in customers" :key="c.id" :value="c.name"></option>
                     </datalist>
 
-                    <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+                    <div class="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm">
                         <div class="grid gap-4 md:grid-cols-4">
                             <label class="text-sm font-medium text-gray-700">
                                 Type
@@ -568,10 +568,10 @@ async function convertDocument() {
                                 <input v-model="form.due_date" :disabled="!isDraft" type="date" class="mt-1 w-full rounded-md border-gray-300 text-sm">
                             </label>
                         </div>
-                        <div class="mt-4 rounded-md border border-gray-200 bg-gray-50 p-3" v-if="form.customer_name">
-                            <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        <div class="mt-5 rounded-xl border border-gray-100 bg-gray-50/70 p-4" v-if="form.customer_name">
+                            <div class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
                                 Customer Details
-                                <span class="ml-1 font-normal normal-case text-gray-400">— saved to Master Data on draft save</span>
+                                <span class="ml-1 font-normal normal-case tracking-normal text-gray-400">— saved to Master Data on draft save</span>
                             </div>
                             <div class="grid gap-3 md:grid-cols-2">
                                 <label class="text-xs font-medium text-gray-700">
@@ -643,9 +643,9 @@ async function convertDocument() {
                         </div>
                     </div>
 
-                    <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
-                        <div class="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-                            <h3 class="text-sm font-semibold text-gray-900">Line Items</h3>
+                    <div class="overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-sm">
+                        <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+                            <h3 class="text-base font-semibold tracking-tight text-gray-900">Line Items</h3>
                             <button class="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700" :disabled="!isDraft" @click="addItem">Add Item</button>
                         </div>
                         <div class="overflow-x-auto">
@@ -678,9 +678,9 @@ async function convertDocument() {
                                             <datalist :id="`product-options-${index}`">
                                                 <option v-for="product in products" :key="product.id" :value="product.name"></option>
                                             </datalist>
-                                            <textarea v-model="item.description" :disabled="!isDraft" rows="2" class="w-72 rounded-md border-gray-300 text-sm" placeholder="Item description"></textarea>
+                                            <textarea v-model="item.description" :disabled="!isDraft" rows="2" class="w-full min-w-[14rem] rounded-md border-gray-300 text-sm" placeholder="Item description"></textarea>
                                             <input v-model="item.image_url" :disabled="!isDraft"
-                                                   class="mt-2 w-72 rounded-md border-gray-300 font-mono text-xs"
+                                                   class="mt-2 w-full min-w-[14rem] rounded-md border-gray-300 font-mono text-xs"
                                                    placeholder="Image data URI (data:image/png;base64,...) &mdash; optional">
                                         </td>
                                         <td class="px-4 py-3 align-top"><input v-model.number="item.quantity" :disabled="!isDraft" type="number" step="0.0001" class="w-20 rounded-md border-gray-300 text-sm"></td>
@@ -709,19 +709,19 @@ async function convertDocument() {
                     </div>
 
                     <div class="grid gap-5 lg:grid-cols-2">
-                        <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-                            <label class="text-sm font-medium text-gray-700">Terms</label>
-                            <textarea v-model="form.terms" :disabled="!isDraft" rows="4" class="mt-1 w-full rounded-md border-gray-300 text-sm"></textarea>
+                        <div class="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm">
+                            <label class="text-sm font-semibold tracking-tight text-gray-900">Terms</label>
+                            <textarea v-model="form.terms" :disabled="!isDraft" rows="4" class="mt-2 w-full rounded-lg border-gray-300 text-sm"></textarea>
                         </div>
-                        <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-                            <label class="text-sm font-medium text-gray-700">Notes</label>
-                            <textarea v-model="form.notes" :disabled="!isDraft" rows="4" class="mt-1 w-full rounded-md border-gray-300 text-sm"></textarea>
+                        <div class="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm">
+                            <label class="text-sm font-semibold tracking-tight text-gray-900">Notes</label>
+                            <textarea v-model="form.notes" :disabled="!isDraft" rows="4" class="mt-2 w-full rounded-lg border-gray-300 text-sm"></textarea>
                         </div>
                     </div>
 
-                    <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+                    <div class="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm">
                         <div class="flex items-center justify-between">
-                            <h3 class="text-sm font-semibold text-gray-900">Artwork Attachments</h3>
+                            <h3 class="text-base font-semibold tracking-tight text-gray-900">Artwork Attachments</h3>
                             <span class="text-xs text-gray-500">JPG/PNG/WEBP/PDF · max 10 MB per file</span>
                         </div>
                         <div class="mt-4 grid gap-3 md:grid-cols-[1fr_220px_auto]">
@@ -763,57 +763,58 @@ async function convertDocument() {
                     </div>
                 </section>
 
-                <aside class="space-y-5">
-                    <div v-if="isAdmin" class="rounded-lg border border-amber-200 bg-amber-50 p-5 shadow-sm">
-                        <h3 class="text-sm font-semibold text-amber-900">Margin <span class="text-xs font-normal text-amber-700">(admin only &middot; not in PDF)</span></h3>
-                        <dl class="mt-3 space-y-2 text-sm">
-                            <div class="flex justify-between"><dt>Total Margin</dt><dd class="font-mono">{{ money(totalMargin, form.currency) }}</dd></div>
-                            <div class="flex justify-between"><dt>Margin %</dt><dd class="font-mono">{{ marginRate.toFixed(1) }}%</dd></div>
+                <aside class="space-y-4 lg:sticky lg:top-6 lg:self-start">
+                    <div v-if="isAdmin" class="rounded-2xl border border-amber-200/70 bg-amber-50/60 p-5 shadow-sm">
+                        <h3 class="text-sm font-semibold tracking-tight text-amber-900">Margin <span class="text-xs font-normal text-amber-700">· admin only</span></h3>
+                        <dl class="mt-3 space-y-1.5 text-sm">
+                            <div class="flex justify-between"><dt class="text-amber-900/80">Total Margin</dt><dd class="font-mono text-amber-950">{{ money(totalMargin, form.currency) }}</dd></div>
+                            <div class="flex justify-between"><dt class="text-amber-900/80">Margin %</dt><dd class="font-mono text-amber-950">{{ marginRate.toFixed(1) }}%</dd></div>
                         </dl>
-                        <p class="mt-3 text-xs text-amber-700">Set <code>Cost</code> per row to track margin. Customers do not see this column on the PDF.</p>
+                        <p class="mt-3 text-xs leading-relaxed text-amber-700/90">Set <code class="rounded bg-amber-100/70 px-1">Cost</code> per row to track margin. Hidden from PDF.</p>
                     </div>
-                    <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-                        <h3 class="text-sm font-semibold text-gray-900">Totals</h3>
+                    <div class="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm">
+                        <h3 class="text-sm font-semibold tracking-tight text-gray-900">Totals</h3>
                         <dl class="mt-4 space-y-2 text-sm">
-                            <div class="flex justify-between"><dt>Subtotal</dt><dd>{{ money(subtotal, form.currency) }}</dd></div>
-                            <div class="flex justify-between"><dt>Discount</dt><dd>{{ money(discountTotal, form.currency) }}</dd></div>
-                            <div class="flex justify-between"><dt>Tax</dt><dd>{{ money(taxTotal, form.currency) }}</dd></div>
-                            <div class="flex justify-between border-t border-gray-100 pt-3 text-base font-semibold"><dt>Total</dt><dd>{{ money(grandTotal, form.currency) }}</dd></div>
+                            <div class="flex justify-between text-gray-600"><dt>Subtotal</dt><dd class="font-medium text-gray-900">{{ money(subtotal, form.currency) }}</dd></div>
+                            <div class="flex justify-between text-gray-600"><dt>Discount</dt><dd class="font-medium text-gray-900">{{ money(discountTotal, form.currency) }}</dd></div>
+                            <div class="flex justify-between text-gray-600"><dt>Tax</dt><dd class="font-medium text-gray-900">{{ money(taxTotal, form.currency) }}</dd></div>
+                            <div class="mt-2 flex justify-between border-t border-gray-100 pt-3 text-base font-semibold tracking-tight"><dt class="text-gray-900">Total</dt><dd class="text-gray-900">{{ money(grandTotal, form.currency) }}</dd></div>
                         </dl>
-                        <div class="mt-4 rounded bg-gray-50 p-3 text-xs text-gray-600">
-                            Draft hash: <span class="break-all font-mono">{{ form.draft_hash || 'Save draft first' }}</span>
+                        <div class="mt-4 rounded-lg bg-gray-50 p-3 text-xs text-gray-600">
+                            <div class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">Draft Hash</div>
+                            <span class="break-all font-mono">{{ form.draft_hash || 'Save draft first' }}</span>
                         </div>
-                        <div class="mt-3 rounded p-3 text-xs" :class="previewIsFresh ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'">
-                            {{ previewIsFresh ? 'Preview is current.' : 'Preview required before issue.' }}
+                        <div class="mt-3 rounded-lg p-3 text-xs font-medium" :class="previewIsFresh ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'">
+                            {{ previewIsFresh ? '✓ Preview is current' : '↻ Preview required before issue' }}
                         </div>
                     </div>
 
-                    <div v-if="form.id" class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-                        <h3 class="text-sm font-semibold text-gray-900">Document Actions</h3>
+                    <div v-if="form.id" class="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm">
+                        <h3 class="text-sm font-semibold tracking-tight text-gray-900">Document Actions</h3>
                         <div class="mt-4 grid gap-2">
                             <div class="grid grid-cols-2 gap-2">
-                                <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" @click="previewPdf('a4')">Preview A4</button>
-                                <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" @click="downloadPdf('a4')">Download A4</button>
+                                <button class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 shadow-sm transition hover:bg-gray-50" @click="previewPdf('a4')">Preview A4</button>
+                                <button class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 shadow-sm transition hover:bg-gray-50" @click="downloadPdf('a4')">Download A4</button>
                             </div>
                             <div class="grid grid-cols-2 gap-2">
-                                <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" @click="previewPdf('60mm')">Preview 60mm</button>
-                                <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" @click="downloadPdf('60mm')">Download 60mm</button>
+                                <button class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 shadow-sm transition hover:bg-gray-50" @click="previewPdf('60mm')">Preview 60mm</button>
+                                <button class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 shadow-sm transition hover:bg-gray-50" @click="downloadPdf('60mm')">Download 60mm</button>
                             </div>
                         </div>
-                        <div v-if="form.status === 'issued'" class="mt-5 space-y-3">
+                        <div v-if="form.status === 'issued'" class="mt-5 space-y-3 border-t border-gray-100 pt-4">
                             <div v-if="availableConvertTargets.length > 0" class="space-y-2">
-                                <select v-model="convertTarget" class="w-full rounded-md border-gray-300 text-sm">
+                                <select v-model="convertTarget" class="w-full rounded-lg border-gray-300 text-sm">
                                     <option v-for="target in availableConvertTargets" :key="target" :value="target">{{ target }}</option>
                                 </select>
-                                <button class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700" @click="convertDocument">Convert to {{ convertTarget }}</button>
+                                <button class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50" @click="convertDocument">Convert to {{ convertTarget }}</button>
                             </div>
-                            <textarea v-model="voidReason" rows="2" class="w-full rounded-md border-gray-300 text-sm" placeholder="Void reason"></textarea>
-                            <button class="w-full rounded-md bg-red-700 px-3 py-2 text-sm font-semibold text-white" @click="voidDocument">Void</button>
+                            <textarea v-model="voidReason" rows="2" class="w-full rounded-lg border-gray-300 text-sm" placeholder="Void reason"></textarea>
+                            <button class="w-full rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-800" @click="voidDocument">Void</button>
                         </div>
                     </div>
 
-                    <div v-if="form.id && statusHistory.length > 0" class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-                        <h3 class="text-sm font-semibold text-gray-900">Status Timeline</h3>
+                    <div v-if="form.id && statusHistory.length > 0" class="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm">
+                        <h3 class="text-sm font-semibold tracking-tight text-gray-900">Status Timeline</h3>
                         <ol class="mt-3 space-y-3 text-xs">
                             <li v-for="event in statusHistory" :key="event.id" class="border-l-2 border-gray-200 pl-3">
                                 <div class="flex items-baseline justify-between">
