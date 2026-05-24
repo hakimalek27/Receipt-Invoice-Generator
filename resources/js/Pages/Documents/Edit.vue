@@ -645,66 +645,87 @@ async function convertDocument() {
 
                     <div class="overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-sm">
                         <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-                            <h3 class="text-base font-semibold tracking-tight text-gray-900">Line Items</h3>
-                            <button class="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700" :disabled="!isDraft" @click="addItem">Add Item</button>
+                            <div>
+                                <h3 class="text-base font-semibold tracking-tight text-gray-900">Line Items</h3>
+                                <p class="mt-0.5 text-xs text-gray-500">{{ form.items.length }} {{ form.items.length === 1 ? 'item' : 'items' }}</p>
+                            </div>
+                            <button class="rounded-lg border border-gray-200 bg-white px-3.5 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-50" :disabled="!isDraft" @click="addItem">+ Add Item</button>
                         </div>
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-100 text-sm">
-                                <thead class="bg-gray-50 text-left text-xs font-semibold uppercase text-gray-500">
-                                    <tr>
-                                        <th class="px-4 py-3">Item</th>
-                                        <th class="px-4 py-3">Qty</th>
-                                        <th class="px-4 py-3">UOM</th>
-                                        <th class="px-4 py-3">Rate</th>
-                                        <th v-if="isAdmin" class="px-4 py-3" title="Internal cost per unit (admin only, not in PDF)">Cost</th>
-                                        <th class="px-4 py-3">Disc</th>
-                                        <th class="px-4 py-3">Tax</th>
-                                        <th v-if="isAdmin" class="px-4 py-3 text-right" title="(Unit price &minus; cost) &times; qty">Margin</th>
-                                        <th class="px-4 py-3 text-right">Total</th>
-                                        <th class="px-4 py-3"></th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-100">
-                                    <tr v-for="(item, index) in form.items" :key="index">
-                                        <td class="px-4 py-3 align-top">
-                                            <input v-model="item.section_header" :disabled="!isDraft"
-                                                   class="mb-2 w-full rounded-md border-amber-200 bg-amber-50 text-xs"
-                                                   placeholder="Section heading (e.g. Bilik Muaazzin) &mdash; optional">
-                                            <input v-model="item.product_name" :disabled="!isDraft"
-                                                   :list="`product-options-${index}`"
-                                                   @change="productAutofill(index)"
-                                                   class="mb-2 w-full rounded-md border-gray-300 text-xs"
-                                                   placeholder="Product lookup (type or pick)">
-                                            <datalist :id="`product-options-${index}`">
-                                                <option v-for="product in products" :key="product.id" :value="product.name"></option>
-                                            </datalist>
-                                            <textarea v-model="item.description" :disabled="!isDraft" rows="2" class="w-full min-w-[14rem] rounded-md border-gray-300 text-sm" placeholder="Item description"></textarea>
-                                            <input v-model="item.image_url" :disabled="!isDraft"
-                                                   class="mt-2 w-full min-w-[14rem] rounded-md border-gray-300 font-mono text-xs"
-                                                   placeholder="Image data URI (data:image/png;base64,...) &mdash; optional">
-                                        </td>
-                                        <td class="px-4 py-3 align-top"><input v-model.number="item.quantity" :disabled="!isDraft" type="number" step="0.0001" class="w-20 rounded-md border-gray-300 text-sm"></td>
-                                        <td class="px-4 py-3 align-top"><input v-model="item.uom" :disabled="!isDraft" class="w-20 rounded-md border-gray-300 text-sm"></td>
-                                        <td class="px-4 py-3 align-top"><input v-model.number="item.unit_price" :disabled="!isDraft || !canPrice" type="number" step="0.01" class="w-24 rounded-md border-gray-300 text-sm"></td>
-                                        <td v-if="isAdmin" class="px-4 py-3 align-top">
-                                            <input v-model.number="item.cost_unit" :disabled="!isDraft || !canPrice" type="number" step="0.01" class="w-24 rounded-md border-amber-200 bg-amber-50 text-sm" placeholder="optional">
-                                        </td>
-                                        <td class="px-4 py-3 align-top"><input v-model.number="item.discount" :disabled="!isDraft || !canPrice" type="number" step="0.01" class="w-20 rounded-md border-gray-300 text-sm"></td>
-                                        <td class="px-4 py-3 align-top">
-                                            <input v-model="item.tax_type" :disabled="!isDraft || !canPrice" class="mb-2 w-24 rounded-md border-gray-300 text-sm" placeholder="SST">
-                                            <input v-model.number="item.tax_amount" :disabled="!isDraft || !canPrice" type="number" step="0.01" class="w-24 rounded-md border-gray-300 text-sm">
-                                        </td>
-                                        <td v-if="isAdmin" class="px-4 py-3 align-top text-right font-mono text-xs text-amber-700">
-                                            <span v-if="item.cost_unit != null && item.cost_unit !== ''">
-                                                {{ money((Number(item.unit_price || 0) - Number(item.cost_unit || 0)) * Number(item.quantity || 0), form.currency) }}
-                                            </span>
-                                            <span v-else class="text-gray-300">&mdash;</span>
-                                        </td>
-                                        <td class="px-4 py-3 align-top text-right font-medium">{{ money((Number(item.quantity || 0) * Number(item.unit_price || 0)) - Number(item.discount || 0) + Number(item.tax_amount || 0), form.currency) }}</td>
-                                        <td class="px-4 py-3 align-top text-right"><button class="text-sm font-medium text-red-700" :disabled="!isDraft" @click="removeItem(index)">Remove</button></td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                        <div class="divide-y divide-gray-100">
+                            <div v-for="(item, index) in form.items" :key="index" class="px-6 py-5 transition hover:bg-gray-50/40">
+                                <div class="flex items-center justify-between text-xs font-semibold tracking-wide text-gray-400">
+                                    <span class="uppercase">Item {{ index + 1 }}</span>
+                                    <button class="rounded-md px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-30" :disabled="!isDraft || form.items.length === 1" @click="removeItem(index)">Remove</button>
+                                </div>
+
+                                <input v-model="item.section_header" :disabled="!isDraft"
+                                       class="mt-2 w-full rounded-lg border-amber-200 bg-amber-50/60 text-xs placeholder:text-amber-700/60"
+                                       placeholder="Section heading (e.g. Bilik Muaazzin) — optional">
+
+                                <div class="mt-3 grid gap-3 lg:grid-cols-[1fr_auto] lg:items-start">
+                                    <div class="space-y-2 min-w-0">
+                                        <input v-model="item.product_name" :disabled="!isDraft"
+                                               :list="`product-options-${index}`"
+                                               @change="productAutofill(index)"
+                                               class="w-full rounded-lg border-gray-300 text-sm"
+                                               placeholder="Product lookup (type or pick)">
+                                        <datalist :id="`product-options-${index}`">
+                                            <option v-for="product in products" :key="product.id" :value="product.name"></option>
+                                        </datalist>
+                                        <textarea v-model="item.description" :disabled="!isDraft" rows="2" class="w-full rounded-lg border-gray-300 text-sm" placeholder="Item description"></textarea>
+                                    </div>
+                                    <div class="rounded-xl bg-gray-50 px-5 py-3 text-right lg:min-w-[180px]">
+                                        <div class="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Line Total</div>
+                                        <div class="mt-1 text-lg font-semibold tracking-tight text-gray-900">{{ money((Number(item.quantity || 0) * Number(item.unit_price || 0)) - Number(item.discount || 0) + Number(item.tax_amount || 0), form.currency) }}</div>
+                                        <div v-if="isAdmin && item.cost_unit != null && item.cost_unit !== ''" class="mt-1 font-mono text-[11px] text-amber-700">
+                                            margin {{ money((Number(item.unit_price || 0) - Number(item.cost_unit || 0)) * Number(item.quantity || 0), form.currency) }}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mt-3 grid gap-2 grid-cols-2 sm:grid-cols-3" :class="isAdmin ? 'lg:grid-cols-6' : 'lg:grid-cols-5'">
+                                    <label class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                                        Qty
+                                        <input v-model.number="item.quantity" :disabled="!isDraft" type="number" step="0.0001" class="mt-1 w-full rounded-lg border-gray-300 text-sm">
+                                    </label>
+                                    <label class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                                        UOM
+                                        <input v-model="item.uom" :disabled="!isDraft" class="mt-1 w-full rounded-lg border-gray-300 text-sm">
+                                    </label>
+                                    <label class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                                        Rate
+                                        <input v-model.number="item.unit_price" :disabled="!isDraft || !canPrice" type="number" step="0.01" class="mt-1 w-full rounded-lg border-gray-300 text-sm">
+                                    </label>
+                                    <label class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                                        Discount
+                                        <input v-model.number="item.discount" :disabled="!isDraft || !canPrice" type="number" step="0.01" class="mt-1 w-full rounded-lg border-gray-300 text-sm">
+                                    </label>
+                                    <label class="text-[11px] font-semibold uppercase tracking-wide text-gray-500" title="Tax type and amount">
+                                        Tax
+                                        <div class="mt-1 flex gap-1">
+                                            <input v-model="item.tax_type" :disabled="!isDraft || !canPrice" class="w-1/2 min-w-0 rounded-lg border-gray-300 text-sm" placeholder="SST">
+                                            <input v-model.number="item.tax_amount" :disabled="!isDraft || !canPrice" type="number" step="0.01" class="w-1/2 min-w-0 rounded-lg border-gray-300 text-sm" placeholder="0.00">
+                                        </div>
+                                    </label>
+                                    <label v-if="isAdmin" class="text-[11px] font-semibold uppercase tracking-wide text-amber-700" title="Internal cost per unit (admin only, not in PDF)">
+                                        Cost
+                                        <input v-model.number="item.cost_unit" :disabled="!isDraft || !canPrice" type="number" step="0.01" class="mt-1 w-full rounded-lg border-amber-200 bg-amber-50 text-sm" placeholder="optional">
+                                    </label>
+                                </div>
+
+                                <details class="group mt-3">
+                                    <summary class="cursor-pointer select-none text-xs font-medium text-gray-500 transition hover:text-gray-700">
+                                        <span class="group-open:hidden">+ Image data URI (optional)</span>
+                                        <span class="hidden group-open:inline">− Hide image URI</span>
+                                    </summary>
+                                    <input v-model="item.image_url" :disabled="!isDraft"
+                                           class="mt-2 w-full rounded-lg border-gray-300 font-mono text-xs"
+                                           placeholder="data:image/png;base64,...">
+                                </details>
+                            </div>
+                            <div v-if="form.items.length === 0" class="px-6 py-12 text-center text-sm text-gray-500">
+                                No line items yet. Click <strong>+ Add Item</strong> above to start.
+                            </div>
                         </div>
                     </div>
 
