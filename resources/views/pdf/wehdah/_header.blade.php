@@ -80,7 +80,6 @@
                     </div>
                 </div>
             </td>
-            <td class="ws-header-spacer"></td>
         </tr>
     </table>
 @endif
