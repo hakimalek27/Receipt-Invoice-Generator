@@ -140,6 +140,12 @@ class PdfRenderService
                 'quotation' => 'pdf.wehdah.quotation',
                 'delivery_order' => 'pdf.wehdah.delivery_order',
                 'official_receipt' => 'pdf.wehdah.official_receipt',
+                'cash_bill' => 'pdf.wehdah.cash_bill',
+                'proforma_invoice' => 'pdf.wehdah.proforma_invoice',
+                'credit_note' => 'pdf.wehdah.credit_note',
+                'debit_note' => 'pdf.wehdah.debit_note',
+                'purchase_order' => 'pdf.wehdah.purchase_order',
+                'payment_voucher' => 'pdf.wehdah.payment_voucher',
             ],
             'NCS' => [
                 'invoice' => 'pdf.nasceria.invoice',
