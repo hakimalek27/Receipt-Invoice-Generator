@@ -428,7 +428,7 @@ class DocumentWorkflowTest extends TestCase
         ]);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Cannot convert invoice to quotation');
+        $this->expectExceptionMessage('Cannot derive invoice into quotation');
         $this->workflow->convert($invoice->id, 'quotation');
     }
 

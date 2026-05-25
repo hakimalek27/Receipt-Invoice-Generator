@@ -13,9 +13,17 @@ use Illuminate\Support\Facades\DB;
 
 class DocumentWorkflowService
 {
-    private const CONVERSION_TARGETS = [
-        'quotation' => ['invoice', 'delivery_order'],
-        'invoice' => ['delivery_order'],
+    /**
+     * Which target document types each source can be DERIVED into. Source
+     * stays 'issued' after derivation — child docs are linked via the
+     * (now repurposed) converted_from_id column.
+     */
+    public const DERIVATION_TARGETS = [
+        'quotation'        => ['proforma_invoice', 'invoice', 'delivery_order'],
+        'proforma_invoice' => ['invoice'],
+        'invoice'          => ['delivery_order', 'official_receipt', 'credit_note', 'debit_note'],
+        'cash_bill'        => ['delivery_order', 'official_receipt'],
+        'debit_note'       => ['official_receipt'],
     ];
 
     private const RECEIVABLE_DOCUMENT_TYPES = [
@@ -192,19 +200,30 @@ class DocumentWorkflowService
     }
 
     /**
-     * Convert a quotation to an invoice or delivery order.
+     * Derive a child document from a source (e.g. invoice from quotation,
+     * delivery_order from invoice, official_receipt from invoice).
+     *
+     * Source stays 'issued' — no status change. The child has its own
+     * lifecycle and is linked via converted_from_id (semantically:
+     * derived_from_id; column name kept for back-compat).
+     *
+     * Multiple children are allowed: deriving the same target twice creates
+     * two children. The source's chain (convertedTo) grows accordingly.
      */
-    public function convert(int $sourceId, string $targetType, array $overrides = []): Document
+    public function derive(int $sourceId, string $targetType, array $overrides = []): Document
     {
         return DB::transaction(function () use ($sourceId, $targetType, $overrides) {
-            $source = Document::findOrFail($sourceId);
+            $source = Document::with('items')->findOrFail($sourceId);
 
-            if ($source->status !== Document::STATUS_DRAFT && $source->status !== Document::STATUS_ISSUED) {
-                throw new \RuntimeException("Cannot convert from status: {$source->status}");
+            if (! in_array($source->status, [Document::STATUS_DRAFT, Document::STATUS_ISSUED], true)) {
+                throw new \RuntimeException("Cannot derive from status: {$source->status}");
             }
-            if (! in_array($targetType, self::CONVERSION_TARGETS[$source->document_type] ?? [], true)) {
-                throw new \RuntimeException("Cannot convert {$source->document_type} to {$targetType}");
+            $allowed = self::DERIVATION_TARGETS[$source->document_type] ?? [];
+            if (! in_array($targetType, $allowed, true)) {
+                throw new \RuntimeException("Cannot derive {$source->document_type} into {$targetType}");
             }
+
+            $isReceipt = $targetType === 'official_receipt';
 
             $target = Document::create([
                 'company_id' => $source->company_id,
@@ -218,31 +237,48 @@ class DocumentWorkflowService
                 'notes' => $overrides['notes'] ?? $source->notes,
                 'terms' => $overrides['terms'] ?? $source->terms,
                 'converted_from_id' => $source->id,
-                'show_amount_in_words' => $source->show_amount_in_words,
+                // Receipts default to showing amount-in-words; others mirror source.
+                'show_amount_in_words' => $isReceipt ? true : $source->show_amount_in_words,
                 'amount_in_words_locale' => $source->amount_in_words_locale,
-                'amount_in_words_currency' => $source->amount_in_words_currency,
+                'amount_in_words_currency' => $source->amount_in_words_currency ?? $source->currency,
             ]);
 
-            // Copy items
-            foreach ($source->items as $i => $item) {
-                $override = $overrides['items'][$i] ?? [];
-                DocumentItem::create($this->itemPayload($target->id, [
-                    'product_id' => $item->product_id,
-                    'description' => $override['description'] ?? $item->description,
-                    'section_header' => $override['section_header'] ?? $item->section_header,
-                    'image_url' => $override['image_url'] ?? $item->image_url,
-                    'quantity' => $override['quantity'] ?? $item->quantity,
-                    'uom' => $override['uom'] ?? $item->uom,
-                    'unit_price' => $override['unit_price'] ?? $item->unit_price,
-                    'cost_unit' => $override['cost_unit'] ?? $item->cost_unit,
-                    'discount' => $override['discount'] ?? $item->discount,
-                    'tax_type' => $override['tax_type'] ?? $item->tax_type,
-                    'tax_rate' => $override['tax_rate'] ?? $item->tax_rate,
-                    'tax_amount' => $override['tax_amount'] ?? $item->tax_amount,
-                    'classification_code' => $override['classification_code'] ?? $item->classification_code,
-                    'tax_exemption_reason' => $override['tax_exemption_reason'] ?? $item->tax_exemption_reason,
-                    'sort_order' => $i,
-                ], $i));
+            // Build items: receipts collapse to a single "Payment for ..." line;
+            // other targets clone the source line-items verbatim.
+            $items = $isReceipt
+                ? [[
+                    'description' => 'Payment for '.($source->official_number ?? "DOC-{$source->id}"),
+                    'quantity' => 1,
+                    'uom' => 'lot',
+                    'unit_price' => (float) $source->grand_total,
+                    'discount' => 0,
+                    'tax_amount' => 0,
+                    'sort_order' => 0,
+                ]]
+                : $source->items->values()->map(function ($item, $i) use ($overrides) {
+                    $override = $overrides['items'][$i] ?? [];
+
+                    return [
+                        'product_id' => $item->product_id,
+                        'description' => $override['description'] ?? $item->description,
+                        'section_header' => $override['section_header'] ?? $item->section_header,
+                        'image_url' => $override['image_url'] ?? $item->image_url,
+                        'quantity' => $override['quantity'] ?? $item->quantity,
+                        'uom' => $override['uom'] ?? $item->uom,
+                        'unit_price' => $override['unit_price'] ?? $item->unit_price,
+                        'cost_unit' => $override['cost_unit'] ?? $item->cost_unit,
+                        'discount' => $override['discount'] ?? $item->discount,
+                        'tax_type' => $override['tax_type'] ?? $item->tax_type,
+                        'tax_rate' => $override['tax_rate'] ?? $item->tax_rate,
+                        'tax_amount' => $override['tax_amount'] ?? $item->tax_amount,
+                        'classification_code' => $override['classification_code'] ?? $item->classification_code,
+                        'tax_exemption_reason' => $override['tax_exemption_reason'] ?? $item->tax_exemption_reason,
+                        'sort_order' => $i,
+                    ];
+                })->all();
+
+            foreach ($items as $i => $row) {
+                DocumentItem::create($this->itemPayload($target->id, $row, $i));
             }
 
             $target->load('items');
@@ -251,16 +287,8 @@ class DocumentWorkflowService
             $target->draft_hash = $this->fingerprint->hash($target);
             $target->save();
 
-            // Mark source as converted if it was issued
-            if ($source->isIssued()) {
-                $source->update(['status' => Document::STATUS_CONVERTED]);
-                DocumentStatusHistory::create([
-                    'document_id' => $source->id,
-                    'from_status' => Document::STATUS_ISSUED,
-                    'to_status' => Document::STATUS_CONVERTED,
-                ]);
-            }
-
+            // Source stays 'issued' (no status change). Only log the new
+            // child's birth in the status history.
             DocumentStatusHistory::create([
                 'document_id' => $target->id,
                 'from_status' => null,
@@ -269,6 +297,14 @@ class DocumentWorkflowService
 
             return $target;
         });
+    }
+
+    /**
+     * @deprecated Use derive() instead. Kept for back-compat with older callers.
+     */
+    public function convert(int $sourceId, string $targetType, array $overrides = []): Document
+    {
+        return $this->derive($sourceId, $targetType, $overrides);
     }
 
     /**

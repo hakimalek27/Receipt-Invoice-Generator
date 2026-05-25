@@ -167,7 +167,6 @@ function statusBadgeClass(status) {
     return {
         draft: 'bg-amber-100 text-amber-800',
         issued: 'bg-emerald-100 text-emerald-800',
-        converted: 'bg-indigo-100 text-indigo-800',
         void: 'bg-red-100 text-red-800',
         cancelled: 'bg-gray-200 text-gray-700',
     }[status] || 'bg-gray-100 text-gray-700';
@@ -176,10 +175,10 @@ function statusBadgeClass(status) {
 function chainTooltip(document) {
     const parts = [];
     if (document.converted_from) {
-        parts.push(`From ${document.converted_from.document_type} ${document.converted_from.official_number || '#' + document.converted_from.id}`);
+        parts.push(`Derived from ${document.converted_from.document_type} ${document.converted_from.official_number || '#' + document.converted_from.id}`);
     }
     if (document.converted_to?.length) {
-        parts.push(`Converted to: ${document.converted_to.map((c) => c.document_type + ' ' + (c.official_number || '#' + c.id)).join(', ')}`);
+        parts.push(`Derived to: ${document.converted_to.map((c) => c.document_type + ' ' + (c.official_number || '#' + c.id)).join(', ')}`);
     }
     return parts.join(' · ');
 }
@@ -235,7 +234,6 @@ function chainTooltip(document) {
                             <option value="">All statuses</option>
                             <option value="draft">draft</option>
                             <option value="issued">issued</option>
-                            <option value="converted">converted</option>
                             <option value="void">void</option>
                             <option value="cancelled">cancelled</option>
                         </select>

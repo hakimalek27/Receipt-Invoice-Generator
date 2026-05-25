@@ -180,10 +180,11 @@ class DocumentController extends Controller
             && ! $request->user()->isSuperAdmin()) {
             return response()->json(['error' => 'Company scope violation'], 403);
         }
-        // Draft, issued, and converted documents are all editable so admins
-        // can correct typos / numbers after the fact. Only void / cancelled
-        // (the explicit lifecycle "dead" states) stay locked.
-        if (! in_array($document->status, [Document::STATUS_DRAFT, Document::STATUS_ISSUED, Document::STATUS_CONVERTED], true)) {
+        // Draft and issued documents are editable so admins can correct
+        // typos / numbers after the fact. Void / cancelled (explicit
+        // lifecycle dead-ends) stay locked. The legacy 'converted' status
+        // is gone (PR moves to derive model where source stays issued).
+        if (! in_array($document->status, [Document::STATUS_DRAFT, Document::STATUS_ISSUED], true)) {
             return response()->json(['error' => 'Documents in '.$document->status.' status cannot be edited'], 422);
         }
 
@@ -245,7 +246,7 @@ class DocumentController extends Controller
 
         try {
             DB::transaction(function () use ($document, $data) {
-                $wasFrozen = $document->isIssued() || $document->status === Document::STATUS_CONVERTED;
+                $wasFrozen = $document->isIssued();
 
                 $document->update(collect($data)->except('items')->all());
 
@@ -363,7 +364,7 @@ class DocumentController extends Controller
         }
 
         $data = $request->validate([
-            'target_type' => 'required|string',
+            'target_type' => 'required|string|in:proforma_invoice,invoice,delivery_order,official_receipt,credit_note,debit_note',
             'document_date' => 'nullable|date',
             'due_date' => 'nullable|date',
             'notes' => 'nullable|string',
@@ -373,7 +374,7 @@ class DocumentController extends Controller
 
         try {
             return response()->json(
-                $this->workflow->convert($id, $data['target_type'], $data)->load('items'),
+                $this->workflow->derive($id, $data['target_type'], $data)->load('items'),
                 201
             );
         } catch (\RuntimeException $e) {
