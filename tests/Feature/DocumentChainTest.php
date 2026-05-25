@@ -45,7 +45,7 @@ class DocumentChainTest extends TestCase
         }
     }
 
-    public function test_convert_links_source_via_converted_from_id(): void
+    public function test_derive_links_source_via_converted_from_id(): void
     {
         $quote = $this->workflow->issue($this->workflow->createDraft([
             'company_id' => $this->company->id,
@@ -53,10 +53,43 @@ class DocumentChainTest extends TestCase
             'items' => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 200]],
         ])->id);
 
-        $invoice = $this->workflow->convert($quote->id, 'invoice', []);
+        $invoice = $this->workflow->derive($quote->id, 'invoice', []);
 
         $this->assertSame($quote->id, $invoice->converted_from_id);
         $this->assertSame('invoice', $invoice->document_type);
+    }
+
+    public function test_derive_keeps_source_as_issued(): void
+    {
+        $quote = $this->workflow->issue($this->workflow->createDraft([
+            'company_id' => $this->company->id,
+            'document_type' => 'quotation',
+            'items' => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 200]],
+        ])->id);
+
+        $this->workflow->derive($quote->id, 'invoice', []);
+        $quote->refresh();
+
+        $this->assertSame('issued', $quote->status, 'Source must remain issued after derive (no more "converted" status).');
+    }
+
+    public function test_multiple_derives_from_one_source(): void
+    {
+        $quote = $this->workflow->issue($this->workflow->createDraft([
+            'company_id' => $this->company->id,
+            'document_type' => 'quotation',
+            'items' => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 200]],
+        ])->id);
+
+        $first = $this->workflow->derive($quote->id, 'invoice', []);
+        $second = $this->workflow->derive($quote->id, 'invoice', []);
+
+        $quote->refresh();
+        $this->assertSame('issued', $quote->status);
+        $this->assertNotSame($first->id, $second->id);
+        $this->assertSame($quote->id, $first->converted_from_id);
+        $this->assertSame($quote->id, $second->converted_from_id);
+        $this->assertSame(2, $quote->convertedTo()->count(), 'Source should now have two derived children.');
     }
 
     public function test_inertia_payload_includes_chain_relations(): void
@@ -66,7 +99,7 @@ class DocumentChainTest extends TestCase
             'document_type' => 'quotation',
             'items' => [['description' => 'Service', 'quantity' => 1, 'unit_price' => 200]],
         ])->id);
-        $invoice = $this->workflow->convert($quote->id, 'invoice', []);
+        $invoice = $this->workflow->derive($quote->id, 'invoice', []);
 
         $this->actingAs($this->user)
             ->get("/documents/{$invoice->id}")
@@ -93,7 +126,7 @@ class DocumentChainTest extends TestCase
             );
     }
 
-    public function test_invalid_conversion_target_returns_422(): void
+    public function test_invalid_derivation_target_returns_422(): void
     {
         $invoice = $this->workflow->issue($this->workflow->createDraft([
             'company_id' => $this->company->id,

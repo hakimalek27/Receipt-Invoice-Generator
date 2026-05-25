@@ -109,6 +109,7 @@ Route::middleware(['auth', 'company'])->group(function () {
         'customers' => Customer::forCompany(effective_company_id())->active()->orderBy('name')->get(),
         'products' => Product::forCompany(effective_company_id())->active()->orderBy('name')->get(),
         'documentTypes' => document_type_options(),
+        'derivationTargetsMap' => derivation_targets_map(),
     ]))->name('documents.create');
 
     Route::get('/documents/{document}', function (Document $document) {
@@ -127,6 +128,7 @@ Route::middleware(['auth', 'company'])->group(function () {
             'customers' => Customer::forCompany(effective_company_id())->active()->orderBy('name')->get(),
             'products' => Product::forCompany(effective_company_id())->active()->orderBy('name')->get(),
             'documentTypes' => document_type_options(),
+            'derivationTargetsMap' => derivation_targets_map(),
             'statusHistory' => $document->statusHistory()
                 ->with('changedBy:id,name')
                 ->orderBy('created_at')

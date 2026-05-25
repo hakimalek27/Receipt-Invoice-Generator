@@ -10,6 +10,7 @@ const props = defineProps({
     customers: Array,
     products: Array,
     documentTypes: Array,
+    derivationTargetsMap: { type: Object, default: () => ({}) },
     statusHistory: { type: Array, default: () => [] },
 });
 
@@ -24,11 +25,22 @@ const initialItems = props.document?.items?.length
     ? props.document.items
     : [{ description: '', quantity: 1, uom: 'unit', unit_price: 0, discount: 0, tax_type: '', tax_rate: 0, tax_amount: 0 }];
 
-// MIRRORS app/Services/DocumentWorkflowService.php::CONVERSION_TARGETS
-const CONVERSION_TARGETS = {
-    quotation: ['invoice', 'delivery_order'],
-    invoice: ['delivery_order'],
+// Pretty labels for the derive buttons. Falls back to the raw type if missing.
+const DOC_TYPE_LABELS = {
+    quotation: 'Quotation',
+    proforma_invoice: 'Proforma Invoice',
+    invoice: 'Invoice',
+    delivery_order: 'Delivery Order',
+    official_receipt: 'Official Receipt',
+    cash_bill: 'Cash Bill',
+    credit_note: 'Credit Note',
+    debit_note: 'Debit Note',
+    purchase_order: 'Purchase Order',
+    payment_voucher: 'Payment Voucher',
 };
+function docTypeLabel(t) {
+    return DOC_TYPE_LABELS[t] || t.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 const form = reactive({
     id: props.document?.id ?? null,
@@ -102,15 +114,17 @@ const lastPreviewHash = ref(null);
 const draggedAttachmentIndex = ref(null);
 const artworkFiles = ref([]);
 const artworkCaption = ref('');
-const availableConvertTargets = computed(() => CONVERSION_TARGETS[form.document_type] || []);
-const convertTarget = ref(availableConvertTargets.value[0] ?? 'invoice');
+// "Generate from this" buttons read from the backend-provided map so the
+// UI list always matches DocumentWorkflowService::DERIVATION_TARGETS.
+const availableDeriveTargets = computed(() => props.derivationTargetsMap?.[form.document_type] || []);
 const voidReason = ref('');
 
 const isDraft = computed(() => form.status === 'draft');
-// Allow edits on drafts, issued, and converted (superseded) docs so typos /
-// amount fixes can be corrected after the fact. Only void / cancelled stay
-// locked since those are explicit dead-letter lifecycle states.
-const canEdit = computed(() => ['draft', 'issued', 'converted'].includes(form.status));
+// Allow edits on drafts and issued docs so typos / amount fixes can be
+// corrected after the fact. Only void / cancelled stay locked since those
+// are explicit dead-letter lifecycle states. (The legacy 'converted'
+// status has been removed in favour of the derive model.)
+const canEdit = computed(() => ['draft', 'issued'].includes(form.status));
 
 // Predefined unit list for the per-item UOM dropdown (mix EN + MS, ordered
 // by frequency in invoicing).
@@ -491,11 +505,14 @@ function statusColor(status) {
     }[status] || 'text-gray-700';
 }
 
-async function convertDocument() {
+async function deriveDocument(targetType) {
     busy.value = true;
     error.value = '';
     try {
-        const document = await apiFetch(`/api/documents/${form.id}/convert`, { method: 'POST', body: JSON.stringify({ target_type: convertTarget.value }) });
+        const document = await apiFetch(`/api/documents/${form.id}/convert`, {
+            method: 'POST',
+            body: JSON.stringify({ target_type: targetType }),
+        });
         window.location.href = `/documents/${document.id}`;
     } catch (exception) {
         error.value = exception.message;
@@ -533,22 +550,22 @@ async function convertDocument() {
                 <section class="min-w-0 space-y-5">
                     <div v-if="message" class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 shadow-sm">{{ message }}</div>
                     <div v-if="error" class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800 shadow-sm">{{ error }}</div>
-                    <div v-if="['issued', 'converted'].includes(form.status)" class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm">
-                        <span class="font-semibold">Editing a {{ form.status }} document.</span>
+                    <div v-if="form.status === 'issued'" class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm">
+                        <span class="font-semibold">Editing an issued document.</span>
                         Any changes you save will update the PDF the customer sees. The original at-issue snapshot is replaced.
                     </div>
 
                     <div v-if="document?.converted_from || (document?.converted_to?.length)"
                          class="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
                         <div v-if="document.converted_from" class="flex flex-wrap items-baseline gap-1">
-                            <span class="font-medium">Source:</span>
+                            <span class="font-medium">Derived from:</span>
                             <Link :href="`/documents/${document.converted_from.id}`" class="font-mono underline">
                                 {{ document.converted_from.official_number || `Draft #${document.converted_from.id}` }}
                             </Link>
                             <span class="text-xs text-indigo-700">({{ document.converted_from.document_type }} · {{ document.converted_from.status }})</span>
                         </div>
                         <div v-if="document?.converted_to?.length" class="mt-1">
-                            <span class="font-medium">Converted to:</span>
+                            <span class="font-medium">Derived to:</span>
                             <ul class="ml-4 list-disc">
                                 <li v-for="child in document.converted_to" :key="child.id">
                                     <Link :href="`/documents/${child.id}`" class="font-mono underline">
@@ -848,13 +865,19 @@ async function convertDocument() {
                                 <button class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 shadow-sm transition hover:bg-gray-50" @click="downloadPdf('60mm')">Download 60mm</button>
                             </div>
                         </div>
-                        <div v-if="form.status === 'issued'" class="mt-5 space-y-3 border-t border-gray-100 pt-4">
-                            <div v-if="availableConvertTargets.length > 0" class="space-y-2">
-                                <select v-model="convertTarget" class="w-full rounded-lg border-gray-300 text-sm">
-                                    <option v-for="target in availableConvertTargets" :key="target" :value="target">{{ target }}</option>
-                                </select>
-                                <button class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50" @click="convertDocument">Convert to {{ convertTarget }}</button>
+                        <div v-if="form.status === 'issued' && availableDeriveTargets.length > 0" class="mt-5 space-y-2 border-t border-gray-100 pt-4">
+                            <div class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Generate from this</div>
+                            <div class="grid gap-2">
+                                <button v-for="target in availableDeriveTargets" :key="target"
+                                        :disabled="busy"
+                                        @click="deriveDocument(target)"
+                                        class="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-left text-xs font-medium text-indigo-900 shadow-sm transition hover:bg-indigo-100 disabled:opacity-50">
+                                    + {{ docTypeLabel(target) }}
+                                </button>
                             </div>
+                            <p class="text-[11px] text-gray-500">Source stays issued. New draft opens with customer + items pre-filled.</p>
+                        </div>
+                        <div v-if="form.status === 'issued'" class="mt-5 space-y-3 border-t border-gray-100 pt-4">
                             <textarea v-model="voidReason" rows="2" class="w-full rounded-lg border-gray-300 text-sm" placeholder="Void reason"></textarea>
                             <button class="w-full rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-800" @click="voidDocument">Void</button>
                         </div>
