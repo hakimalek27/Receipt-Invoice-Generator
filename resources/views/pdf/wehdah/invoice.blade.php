@@ -19,6 +19,9 @@
                 @include('pdf.wehdah._meta-block', ['documentTitleEn' => 'INVOICE', 'showValidity' => false])
             </div>
         </div>
+        @if(!empty($boilerplate['intro']))
+            <p class="ws-intro">{{ $boilerplate['intro'] }}</p>
+        @endif
     @else
         @include('pdf.wehdah._header', ['variant' => 'compact', 'documentTitle' => 'INVOICE'])
     @endif
@@ -26,7 +29,7 @@
     <table class="ws-items">
         <thead>
             <tr>
-                <th class="ws-col-item">Item</th>
+                <th class="ws-col-item">No</th>
                 <th class="ws-col-desc">Description</th>
                 <th class="ws-col-qty">Qty</th>
                 <th class="ws-col-unit">Unit</th>

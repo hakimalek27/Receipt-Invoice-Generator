@@ -29,7 +29,7 @@
     <table class="ws-items">
         <thead>
             <tr>
-                <th class="ws-col-item">Item</th>
+                <th class="ws-col-item">No</th>
                 <th class="ws-col-desc">Description</th>
                 <th class="ws-col-qty">Qty</th>
                 <th class="ws-col-unit">Unit</th>
@@ -67,6 +67,9 @@
                         @if((float) $document->discount_total > 0)
                             <tr><td>Discount</td><td class="r">({{ number_format((float) $document->discount_total, 2) }})</td></tr>
                         @endif
+                        @if((float) $document->tax_total > 0)
+                            <tr><td>Tax</td><td class="r">{{ number_format((float) $document->tax_total, 2) }}</td></tr>
+                        @endif
                     </table>
                 @endif
                 <table class="ws-grand-table">
@@ -77,6 +80,8 @@
                 </table>
             </div>
         </div>
+
+        @include('pdf.wehdah._bank')
 
         @if(!empty($boilerplate['footer_terms']))
             <div class="ws-terms">{!! nl2br(e($boilerplate['footer_terms'])) !!}</div>
