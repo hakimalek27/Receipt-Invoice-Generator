@@ -180,10 +180,10 @@ class DocumentController extends Controller
             && ! $request->user()->isSuperAdmin()) {
             return response()->json(['error' => 'Company scope violation'], 403);
         }
-        // Draft and issued documents are both editable so admins can correct
-        // typos / numbers after issue. Terminal states (void / cancelled /
-        // converted) stay locked.
-        if (! in_array($document->status, [Document::STATUS_DRAFT, Document::STATUS_ISSUED], true)) {
+        // Draft, issued, and converted documents are all editable so admins
+        // can correct typos / numbers after the fact. Only void / cancelled
+        // (the explicit lifecycle "dead" states) stay locked.
+        if (! in_array($document->status, [Document::STATUS_DRAFT, Document::STATUS_ISSUED, Document::STATUS_CONVERTED], true)) {
             return response()->json(['error' => 'Documents in '.$document->status.' status cannot be edited'], 422);
         }
 
@@ -245,7 +245,7 @@ class DocumentController extends Controller
 
         try {
             DB::transaction(function () use ($document, $data) {
-                $wasIssued = $document->isIssued();
+                $wasFrozen = $document->isIssued() || $document->status === Document::STATUS_CONVERTED;
 
                 $document->update(collect($data)->except('items')->all());
 
@@ -259,7 +259,7 @@ class DocumentController extends Controller
                 $document->load('items');
                 $document->recomputeTotals();
 
-                if ($wasIssued) {
+                if ($wasFrozen) {
                     // The frozen-at-issue snapshots would otherwise hide this
                     // edit from the PDF. Null them so the renderer falls back
                     // to live company/customer/etc. Then mark existing cached
