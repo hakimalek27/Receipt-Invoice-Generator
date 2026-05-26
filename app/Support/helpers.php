@@ -46,3 +46,22 @@ if (! function_exists('derivation_targets_map')) {
         return \App\Services\DocumentWorkflowService::DERIVATION_TARGETS;
     }
 }
+
+if (! function_exists('thermal_eligible_doc_types')) {
+    /**
+     * Document types that should be renderable on 60mm thermal paper.
+     * These are the short transactional receipt-style docs; everything
+     * else (invoice, quotation, DO, ...) demands A4 with full details.
+     */
+    function thermal_eligible_doc_types(): array
+    {
+        return ['cash_bill', 'official_receipt', 'payment_voucher'];
+    }
+}
+
+if (! function_exists('is_thermal_eligible')) {
+    function is_thermal_eligible(?string $documentType): bool
+    {
+        return in_array($documentType, thermal_eligible_doc_types(), true);
+    }
+}

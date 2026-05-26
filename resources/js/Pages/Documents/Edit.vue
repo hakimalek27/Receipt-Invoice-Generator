@@ -126,6 +126,13 @@ const isDraft = computed(() => form.status === 'draft');
 // status has been removed in favour of the derive model.)
 const canEdit = computed(() => ['draft', 'issued'].includes(form.status));
 
+// Thermal 60mm is only meaningful for short transactional docs (cash
+// bill, official receipt, payment voucher). Hide the 60mm preview /
+// download buttons for invoice / quote / DO / PO / CN / DN / proforma —
+// those need A4 with full bill-to + signature + bank box.
+const THERMAL_ELIGIBLE_DOC_TYPES = ['cash_bill', 'official_receipt', 'payment_voucher'];
+const isThermalEligible = computed(() => THERMAL_ELIGIBLE_DOC_TYPES.includes(form.document_type));
+
 // Predefined unit list for the per-item UOM dropdown (mix EN + MS, ordered
 // by frequency in invoicing).
 const UOM_OPTIONS = [
@@ -559,7 +566,7 @@ async function deriveDocument(targetType) {
                 <div class="flex flex-wrap items-center gap-2">
                     <Link :href="route('documents.index')" class="rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50">Back</Link>
                     <button class="rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-50" :disabled="busy || !form.id" @click="previewPdf('a4')">Preview A4</button>
-                    <button class="rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-50" :disabled="busy || !form.id" @click="previewPdf('60mm')">60mm</button>
+                    <button v-if="isThermalEligible" class="rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-50" :disabled="busy || !form.id" @click="previewPdf('60mm')">60mm</button>
                     <button v-if="form.id" class="rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-50" :disabled="busy" @click="duplicateThisDocument" title="Clone as new draft">Duplicate</button>
                     <button class="rounded-lg bg-gray-900 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-800 disabled:opacity-50" :disabled="busy || !canEdit" @click="saveDraft">{{ isDraft ? 'Save Draft' : 'Save Changes' }}</button>
                     <button class="rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50" :disabled="busy || !isDraft || !form.id" @click="openIssue">Issue</button>
@@ -882,7 +889,7 @@ async function deriveDocument(targetType) {
                                 <button class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 shadow-sm transition hover:bg-gray-50" @click="previewPdf('a4')">Preview A4</button>
                                 <button class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 shadow-sm transition hover:bg-gray-50" @click="downloadPdf('a4')">Download A4</button>
                             </div>
-                            <div class="grid grid-cols-2 gap-2">
+                            <div v-if="isThermalEligible" class="grid grid-cols-2 gap-2">
                                 <button class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 shadow-sm transition hover:bg-gray-50" @click="previewPdf('60mm')">Preview 60mm</button>
                                 <button class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 shadow-sm transition hover:bg-gray-50" @click="downloadPdf('60mm')">Download 60mm</button>
                             </div>
