@@ -15,6 +15,9 @@
         .c { text-align: center; }
         .r { text-align: right; }
         .b { font-weight: bold; }
+        /* Right-aligned cells get a tiny left padding so the numbers
+           never butt up against the previous column on narrow 60mm. */
+        .cell.r { padding-left: 4px; }
         .hr {
             border-top: 1px dashed #000;
             margin: 5px 0;
@@ -91,28 +94,32 @@
 
     <div class="c doc-title">{{ strtoupper(str_replace('_', ' ', $document->document_type)) }}</div>
 
-    {{-- Meta block (Receipt No / Cust / Pay By) --}}
-    <div class="row meta-row">
-        <div class="meta-cell"><span class="b">Receipt No:</span> {{ $document->official_number ?? '-' }}</div>
-        <div class="meta-cell"><span class="b">Date:</span> {{ optional($document->document_date)->format('d/m/Y') }}</div>
-    </div>
-    <div class="row meta-row">
-        <div class="meta-cell"><span class="b">Cust:</span> {{ $customer?->name ?? 'Cash Sales' }}</div>
-        @if(!empty($payment['method']))
-            <div class="meta-cell"><span class="b">Pay By:</span> {{ ucfirst(str_replace('_', ' ', $payment['method'])) }}</div>
-        @else
-            <div class="meta-cell"></div>
-        @endif
-    </div>
+    {{-- Meta block — stack vertically so long values (number, customer
+         name) get the full 56mm content width instead of fighting for
+         half of a two-column row. --}}
+    @php
+        $docNoLabels = [
+            'cash_bill' => 'Bill No:',
+            'official_receipt' => 'Receipt No:',
+            'payment_voucher' => 'Voucher No:',
+        ];
+        $docNoLabel = $docNoLabels[$document->document_type] ?? 'Doc No:';
+    @endphp
+    <div><span class="b">{{ $docNoLabel }}</span> {{ $document->official_number ?? '-' }}</div>
+    <div><span class="b">Date:</span> {{ optional($document->document_date)->format('d/m/Y') }}</div>
+    <div><span class="b">Cust:</span> {{ $customer?->name ?? 'Cash Sales' }}</div>
+    @if(!empty($payment['method']))
+        <div><span class="b">Pay By:</span> {{ ucfirst(str_replace('_', ' ', $payment['method'])) }}</div>
+    @endif
 
     <div class="hr"></div>
 
     {{-- Items header --}}
     <div class="row b">
-        <div class="cell" style="width: 48%;">Item</div>
-        <div class="cell r" style="width: 12%;">Qty</div>
-        <div class="cell r" style="width: 20%;">Price</div>
-        <div class="cell r" style="width: 20%;">Total</div>
+        <div class="cell" style="width: 30%;">Item</div>
+        <div class="cell r" style="width: 15%;">Qty</div>
+        <div class="cell r" style="width: 25%;">Price</div>
+        <div class="cell r" style="width: 30%;">Total</div>
     </div>
 
     <div class="hr"></div>
@@ -127,10 +134,10 @@
         <div class="item-row">
             <div>{{ $item->description }}</div>
             <div class="row">
-                <div class="cell" style="width: 48%;">{{ $code }}</div>
-                <div class="cell r" style="width: 12%;">{{ $qtyDisplay }}</div>
-                <div class="cell r" style="width: 20%;">{{ number_format((float) ($item->unit_price ?? 0), 2) }}</div>
-                <div class="cell r" style="width: 20%;">{{ number_format($lineTotal, 2) }}</div>
+                <div class="cell" style="width: 30%;">{{ $code }}</div>
+                <div class="cell r" style="width: 15%;">{{ $qtyDisplay }}</div>
+                <div class="cell r" style="width: 25%;">{{ number_format((float) ($item->unit_price ?? 0), 2) }}</div>
+                <div class="cell r" style="width: 30%;">{{ number_format($lineTotal, 2) }}</div>
             </div>
         </div>
     @endforeach

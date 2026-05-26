@@ -22,6 +22,11 @@ class PdfDownloadController extends Controller
         }
 
         $paper = $request->query('paper', 'a4') === '60mm' ? '60mm' : 'A4';
+
+        if ($paper === '60mm' && ! is_thermal_eligible($document->document_type)) {
+            abort(422, "Document type '{$document->document_type}' is not supported on 60mm thermal paper. Use A4 instead.");
+        }
+
         $version = $request->query('version');
 
         $render = $version

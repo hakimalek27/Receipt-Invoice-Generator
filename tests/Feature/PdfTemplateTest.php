@@ -308,6 +308,34 @@ class PdfTemplateTest extends TestCase
         $this->assertGreaterThan(0, $box[3]);
     }
 
+    public function test_thermal_rejected_for_invoice(): void
+    {
+        $company = Company::factory()->create(['code' => 'WS']);
+        $user = User::factory()->create(['company_id' => $company->id, 'role' => 'admin']);
+        $document = $this->draft($company, 'invoice', 1);
+
+        Sanctum::actingAs($user);
+
+        $this->get("/api/documents/{$document->id}/pdf?paper=60mm")
+            ->assertStatus(422);
+    }
+
+    public function test_thermal_allowed_for_short_doc_types(): void
+    {
+        Storage::fake('local');
+        $company = Company::factory()->create(['code' => 'WS']);
+        $user = User::factory()->create(['company_id' => $company->id, 'role' => 'admin']);
+        Sanctum::actingAs($user);
+
+        foreach (['cash_bill', 'official_receipt', 'payment_voucher'] as $type) {
+            $document = $this->draft($company, $type, 1);
+
+            $this->get("/api/documents/{$document->id}/pdf?paper=60mm")
+                ->assertOk()
+                ->assertHeader('Content-Type', 'application/pdf');
+        }
+    }
+
     public function test_attachment_upload_rejects_svg_and_path_traversal_names(): void
     {
         Storage::fake('local');
