@@ -448,6 +448,28 @@ async function duplicateThisDocument() {
     }
 }
 
+// Used by the Danger Zone delete button: block when the doc is a source
+// of derived children — admin must delete the chain bottom-up first.
+const childrenCount = computed(() => props.document?.converted_to?.length ?? 0);
+
+async function deleteThisDocument() {
+    if (!form.id) return;
+    const isDraft = form.status === 'draft';
+    const numStr = form.official_number || `Draft #${form.id}`;
+    const msg = isDraft
+        ? `Permanently delete this draft? This cannot be undone.`
+        : `Delete ${form.document_type} ${numStr}?\n\nThe number will be reusable for new documents. This cannot be undone.`;
+    if (!window.confirm(msg)) return;
+    busy.value = true;
+    try {
+        await apiFetch(`/api/documents/${form.id}`, { method: 'DELETE' });
+        window.location.href = '/documents';
+    } catch (e) {
+        error.value = e.message;
+        busy.value = false;
+    }
+}
+
 function openIssue() {
     confirmedTotal.value = grandTotal.value.toFixed(2);
     issueOpen.value = true;
@@ -881,6 +903,26 @@ async function deriveDocument(targetType) {
                             <textarea v-model="voidReason" rows="2" class="w-full rounded-lg border-gray-300 text-sm" placeholder="Void reason"></textarea>
                             <button class="w-full rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-800" @click="voidDocument">Void</button>
                         </div>
+                    </div>
+
+                    <div v-if="form.id && ['draft', 'issued', 'void', 'cancelled'].includes(form.status)"
+                         class="rounded-2xl border border-red-200/70 bg-red-50/40 p-6 shadow-sm">
+                        <h3 class="text-sm font-semibold tracking-tight text-red-900">Danger Zone</h3>
+                        <p class="mt-1 text-xs leading-relaxed text-red-800/80">
+                            Soft-deletes this document. The number
+                            <span class="font-mono font-semibold">{{ form.official_number || `Draft #${form.id}` }}</span>
+                            will be reusable for new documents.
+                        </p>
+                        <button
+                            type="button"
+                            class="mt-3 w-full rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-800 disabled:opacity-50"
+                            :disabled="busy || childrenCount > 0"
+                            :title="childrenCount > 0 ? `Has ${childrenCount} derived doc(s) — delete those first` : 'Delete this document'"
+                            @click="deleteThisDocument"
+                        >
+                            Delete Document
+                            <span v-if="childrenCount > 0" class="ml-1 text-[10px] font-normal opacity-80">(blocked: {{ childrenCount }} children)</span>
+                        </button>
                     </div>
 
                     <div v-if="form.id && statusHistory.length > 0" class="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm">

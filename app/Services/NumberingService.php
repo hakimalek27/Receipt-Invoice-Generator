@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Document;
 use App\Models\NumberingPolicy;
 use App\Models\SequenceCounter;
 use Illuminate\Support\Facades\DB;
@@ -47,11 +48,63 @@ class NumberingService
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            // Gap-fill: pick the lowest sequence number in [1..current_sequence]
+            // that no live document is using. Soft-deleted docs are auto-excluded
+            // by the SoftDeletes default scope, so their numbers become free again.
+            $usedSequences = Document::where('company_id', $companyId)
+                ->where('document_type', $documentType)
+                ->whereYear('document_date', $year)
+                ->whereNotNull('official_number')
+                ->pluck('official_number')
+                ->map(fn ($n) => $this->extractSequence((string) $n, $policy))
+                ->filter(fn ($v) => $v !== null)
+                ->values()
+                ->all();
+            $usedSet = array_flip($usedSequences);
+
+            for ($candidate = 1; $candidate <= $counter->current_sequence; $candidate++) {
+                if (! isset($usedSet[$candidate])) {
+                    // Found a hole — re-use it without bumping the counter.
+                    return $this->format($policy, $candidate, $year);
+                }
+            }
+
+            // No gaps → continue the sequence as before.
             $counter->increment('current_sequence');
             $counter->refresh();
 
             return $this->format($policy, $counter->current_sequence, $year);
         });
+    }
+
+    /**
+     * Parse the numeric sequence portion out of a fully-formatted official
+     * number. Returns null if the format does not match the policy (e.g.
+     * legacy data, manual entry).
+     *
+     * Heuristic: walk the segments back-to-front and return the first
+     * all-digit segment whose length matches the policy's sequence_padding.
+     * That avoids confusing the sequence with the year token, which is
+     * typically a different width.
+     */
+    private function extractSequence(string $officialNumber, NumberingPolicy $policy): ?int
+    {
+        $separator = $policy->separator ?? '-';
+        if ($separator === '') {
+            return null;
+        }
+
+        $parts = explode($separator, $officialNumber);
+        $expectedLen = (int) ($policy->sequence_padding ?? 0);
+
+        foreach (array_reverse($parts) as $part) {
+            if (preg_match('/^\d+$/', $part)
+                && ($expectedLen === 0 || strlen($part) === $expectedLen)) {
+                return (int) $part;
+            }
+        }
+
+        return null;
     }
 
     /**

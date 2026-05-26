@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Document;
 use App\Models\DocumentItem;
+use App\Models\DocumentStatusHistory;
 use App\Models\IdempotencyKey;
 use App\Models\Product;
 use App\Services\DocumentFingerprintService;
@@ -304,20 +305,51 @@ class DocumentController extends Controller
 
     public function destroy(Request $request, int $id): JsonResponse
     {
-        $document = Document::findOrFail($id);
+        $document = Document::with('convertedTo:id,document_type,official_number,converted_from_id')
+            ->findOrFail($id);
         $companyId = \App\Services\ActiveCompanyResolver::resolve($request->user(), $request);
         if ($document->company_id !== $companyId && ! $request->user()->isSuperAdmin()) {
             return response()->json(['error' => 'Company scope violation'], 403);
         }
-        if (! $document->isDraft()) {
-            return response()->json(['error' => 'Only draft documents may be deleted; use void for issued documents.'], 422);
-        }
-        $document->delete();
 
-        return response()->json(['deleted' => true]);
+        // Block deletion when this doc is the source of derived children;
+        // the user must delete the children first so we don't orphan them.
+        if ($document->convertedTo->isNotEmpty()) {
+            $kids = $document->convertedTo
+                ->map(fn ($c) => ($c->official_number ?? "Draft #{$c->id}").' ('.$c->document_type.')')
+                ->implode(', ');
+
+            return response()->json([
+                'error' => "Cannot delete — this document has derived children: {$kids}. Delete those first.",
+                'children_count' => $document->convertedTo->count(),
+            ], 422);
+        }
+
+        $previousStatus = $document->status;
+        $recycledNumber = $document->official_number;
+
+        DB::transaction(function () use ($document, $previousStatus, $request) {
+            DocumentStatusHistory::create([
+                'document_id' => $document->id,
+                'from_status' => $previousStatus,
+                'to_status' => 'deleted',
+                'changed_by_user_id' => $request->user()?->id,
+                'reason' => $request->input('reason'),
+            ]);
+            // Soft delete preserves the row for audit; the SoftDeletes
+            // default scope hides it, so NumberingService::allocate() will
+            // see the (formerly used) sequence number as free again.
+            $document->delete();
+        });
+
+        return response()->json([
+            'deleted' => true,
+            'recycled_number' => $recycledNumber,
+            'previous_status' => $previousStatus,
+        ]);
     }
 
-    public function bulkDeleteDrafts(Request $request): JsonResponse
+    public function bulkDelete(Request $request): JsonResponse
     {
         $data = $request->validate([
             'ids' => 'required|array|min:1|max:100',
@@ -325,21 +357,53 @@ class DocumentController extends Controller
         ]);
 
         $companyId = \App\Services\ActiveCompanyResolver::resolve($request->user(), $request);
-        $query = Document::query()
-            ->whereIn('id', $data['ids'])
-            ->where('status', Document::STATUS_DRAFT);
+        $query = Document::with('convertedTo:id,converted_from_id')
+            ->whereIn('id', $data['ids']);
 
         if (! $request->user()->isSuperAdmin()) {
             $query->where('company_id', $companyId);
         }
 
-        $deleted = $query->get();
-        Document::whereIn('id', $deleted->pluck('id'))->delete();
+        $docs = $query->get();
+        $deletedIds = [];
+        $blocked = [];
+
+        DB::transaction(function () use ($docs, $request, &$deletedIds, &$blocked) {
+            foreach ($docs as $doc) {
+                if ($doc->convertedTo->isNotEmpty()) {
+                    $blocked[] = [
+                        'id' => $doc->id,
+                        'official_number' => $doc->official_number,
+                        'reason' => "Has {$doc->convertedTo->count()} derived child(ren) — delete those first.",
+                    ];
+                    continue;
+                }
+
+                DocumentStatusHistory::create([
+                    'document_id' => $doc->id,
+                    'from_status' => $doc->status,
+                    'to_status' => 'deleted',
+                    'changed_by_user_id' => $request->user()?->id,
+                ]);
+                $doc->delete();
+                $deletedIds[] = $doc->id;
+            }
+        });
 
         return response()->json([
-            'deleted_count' => $deleted->count(),
-            'deleted_ids' => $deleted->pluck('id'),
+            'deleted_count' => count($deletedIds),
+            'deleted_ids' => $deletedIds,
+            'blocked' => $blocked,
         ]);
+    }
+
+    /**
+     * @deprecated Use bulkDelete() instead. Route kept for backward compat
+     * with the existing /api/documents/bulk-delete-drafts URL.
+     */
+    public function bulkDeleteDrafts(Request $request): JsonResponse
+    {
+        return $this->bulkDelete($request);
     }
 
     public function duplicate(Request $request, int $id): JsonResponse
