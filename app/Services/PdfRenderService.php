@@ -195,7 +195,7 @@ class PdfRenderService
 
     public function renderData(Document $document): array
     {
-        $document->load('items', 'company', 'customer', 'attachments');
+        $document->load('items.product:id,sku,name', 'company', 'customer', 'attachments');
 
         $company = $document->company;
         $customer = $document->customer;
@@ -371,7 +371,12 @@ class PdfRenderService
             return max(1, (int) ceil(Str::length((string) $item->description) / 28));
         });
 
-        $height = max(360, 220 + ($lineCount * 34) + ($descriptionLines * 12));
+        // Base 320pt covers the centered company header (up to 5 lines),
+        // RECEIPT title, two meta rows, items header, and the six totals
+        // rows (Total Item Qty / Total / Rounding / Amount Due / Payment /
+        // Change Due) + Thank You footer. Each item adds ~40pt for its
+        // description + the qty/price/total detail row.
+        $height = max(420, 320 + ($lineCount * 40) + ($descriptionLines * 12));
 
         return [0, 0, 170.08, $height];
     }
