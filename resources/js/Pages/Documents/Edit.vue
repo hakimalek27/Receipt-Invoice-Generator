@@ -47,6 +47,7 @@ const form = reactive({
     status: props.document?.status ?? 'draft',
     official_number: props.document?.official_number ?? null,
     document_type: props.document?.document_type ?? 'invoice',
+    subject: props.document?.subject ?? '',
     customer_id: props.document?.customer_id ?? '',
     customer_name: props.document?.customer?.name ?? '',
     customer_attention_to: props.document?.customer?.attention_to ?? '',
@@ -229,6 +230,7 @@ function payload() {
     const customerMatch = props.customers?.find((c) => c.name === trimmedCustomerName);
     return {
         document_type: form.document_type,
+        subject: form.subject?.trim() || null,
         customer_id: customerMatch?.id ?? null,
         // Backend find-or-creates a Customer record when no id matches but a name is typed,
         // and updates the customer with the detail fields below (2-way sync with Master Data).
@@ -637,6 +639,13 @@ async function deriveDocument(targetType) {
                                 <input v-model="form.due_date" :disabled="!canEdit" type="date" class="mt-1 w-full rounded-md border-gray-300 text-sm">
                             </label>
                         </div>
+                        <label class="mt-4 block text-sm font-medium text-gray-700">
+                            Subject / Project
+                            <input v-model="form.subject" :disabled="!canEdit"
+                                   class="mt-1 w-full rounded-md border-gray-300 text-sm"
+                                   placeholder="e.g. INTELLIGENT FRAGRANCE &amp; AIR SANITIZATION SYSTEM">
+                            <span class="mt-1 block text-[11px] font-normal text-gray-400">Appears in the document title, e.g. “QUOTATION FOR {subject}”.</span>
+                        </label>
                         <div class="mt-5 rounded-xl border border-gray-100 bg-gray-50/70 p-4" v-if="form.customer_name">
                             <div class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
                                 Customer Details

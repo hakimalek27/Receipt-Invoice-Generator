@@ -19,7 +19,7 @@ class Document extends Model
     public const STATUS_CONVERTED = 'converted';
 
     protected $fillable = [
-        'company_id', 'document_type', 'status', 'official_number',
+        'company_id', 'document_type', 'subject', 'status', 'official_number',
         'customer_id', 'document_date', 'due_date',
         'subtotal', 'discount_total', 'tax_total', 'grand_total',
         'currency', 'fx_rate', 'notes', 'terms', 'internal_notes',

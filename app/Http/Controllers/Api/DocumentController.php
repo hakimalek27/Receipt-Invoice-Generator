@@ -123,6 +123,7 @@ class DocumentController extends Controller
     {
         $data = $request->validate([
             'document_type' => 'required|string',
+            'subject' => 'nullable|string|max:255',
             'customer_id' => 'nullable|exists:customers,id',
             'customer_name' => 'nullable|string|max:255',
             'customer_attention_to' => 'nullable|string|max:255',
@@ -191,6 +192,7 @@ class DocumentController extends Controller
 
         $data = $request->validate([
             'document_type' => 'nullable|string|max:50',
+            'subject' => 'nullable|string|max:255',
             'customer_id' => 'nullable|exists:customers,id',
             'customer_name' => 'nullable|string|max:255',
             'customer_attention_to' => 'nullable|string|max:255',

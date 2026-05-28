@@ -75,6 +75,7 @@ class DocumentWorkflowService
             $document = Document::create([
                 'company_id' => $data['company_id'],
                 'document_type' => $data['document_type'],
+                'subject' => $data['subject'] ?? null,
                 'status' => Document::STATUS_DRAFT,
                 'customer_id' => $data['customer_id'] ?? null,
                 'document_date' => $data['document_date'] ?? now()->toDateString(),
