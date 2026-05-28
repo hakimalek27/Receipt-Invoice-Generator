@@ -4,17 +4,23 @@
     $headerFill = $scentury ? '#B8860B' : $navy;
 @endphp
 <style>
-    /* Top/bottom margins clear the baked letterhead chrome: header block ends
-       ~53mm from the top, the stair-step accent occupies the bottom-right ~39mm. */
-    @page { size: A4 portrait; margin: 55mm 18mm 38mm 18mm; }
+    /* DomPDF ignores @page margins when paper is set via setPaper(), so content
+       clearance for the baked letterhead chrome is handled by the .pgg-frame
+       table's thead/tfoot spacers (they repeat on every page). The default
+       DomPDF margin (~12.5mm) provides the side gutters. */
+    @page { margin: 12mm; }
     body { font-family: 'Helvetica', 'DejaVu Sans', sans-serif; font-size: 11pt; color: #000; margin: 0; }
+
+    /* Pushes page-1 content below the baked letterhead header band (~53mm). */
+    .pgg-top-spacer { height: 56mm; }
 
     /* Full-page letterhead, repeated behind content on every page. */
     .pgg-letterhead-bg { position: fixed; top: 0; left: 0; width: 210mm; height: 297mm; z-index: -1; }
     .pgg-letterhead-bg img { width: 210mm; height: 297mm; display: block; }
 
-    .pgg-salam { text-align: center; margin: 0 0 6pt; }
-    .pgg-salam img { max-height: 26mm; width: auto; }
+    /* Salam floats over the letterhead banner (out of flow, page 1 only). */
+    .pgg-salam { position: absolute; top: 4mm; left: 0; width: 100%; text-align: center; }
+    .pgg-salam img { max-height: 20mm; width: auto; }
 
     .pgg-salutation { font-size: 11pt; margin: 0 0 8pt; }
     .pgg-title { font-size: 11pt; font-weight: bold; margin: 0 0 10pt; }
@@ -71,7 +77,7 @@
     .pgg-terms-free strong { color: {{ $navy }}; }
 
     /* ---- Signature ---- */
-    .pgg-sign { margin-top: 20pt; position: relative; page-break-inside: avoid; }
+    .pgg-sign { margin-top: 20pt; position: relative; }
     .pgg-sign-thanks { font-weight: bold; margin-bottom: 1pt; }
     .pgg-sign-yours { font-weight: bold; margin-bottom: 0; }
     .pgg-sign-dots { margin-top: 34pt; font-size: 13pt; letter-spacing: 1pt; }
