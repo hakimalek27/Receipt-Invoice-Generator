@@ -41,45 +41,51 @@
      page-1 content below the baked letterhead header band. --}}
 <div class="pgg-top-spacer"></div>
 
-    @if(! empty($document->include_arabic_salutation) && ! empty($brand['salam_data_uri']))
-        <div class="pgg-salam"><img src="{{ $brand['salam_data_uri'] }}" alt=""></div>
-    @endif
+    @php
+        $recipientName = $customer->name ?? 'Walk-in Customer';
+        $attn = $customer?->attention_to ?? null;
+    @endphp
 
     @if($style === 'letter')
         <div class="pgg-cols">
             <div class="pgg-col-left">
-                <div class="pgg-recipient-label">{{ $customerLabel }}</div>
-                <div class="pgg-recipient-name">{{ $customer->name ?? 'Walk-in Customer' }}</div>
-                @if(! empty($customer?->attention_to))<div>Attn: {{ $customer->attention_to }}</div>@endif
+                @if($attn)<div class="pgg-recipient-attn">{{ $attn }}</div>@endif
+                <div>{{ $recipientName }}</div>
                 @if(! empty($customer?->address))<div>{{ $customer->address }}</div>@endif
-                @if($regionLine !== '')<div>{{ $regionLine }}</div>@endif
             </div>
             <div class="pgg-col-right">
                 <table class="pgg-meta">
                     @foreach($metaRows as $row)
-                        <tr><td class="k">{{ $row[0] }}</td><td class="v">{{ $row[1] }}</td></tr>
+                        <tr><td class="k">{{ $row[0] }}</td><td class="colon">:</td><td class="v">{{ $row[1] ?? '' }}</td></tr>
                     @endforeach
                 </table>
             </div>
         </div>
+
+        @if(! empty($document->include_arabic_salutation) && ! empty($brand['salam_data_uri']))
+            <div class="pgg-salam"><img src="{{ $brand['salam_data_uri'] }}" alt=""></div>
+        @endif
+
         <div class="pgg-salutation">Dear Tan Sri/ Datuk Seri/ Dato’, Tuan, Puan,</div>
         <div class="pgg-title">{{ $title }}</div>
         @if($extraNote)<div class="pgg-extra-note">{{ $extraNote }}</div>@endif
         @if($intro)<div class="pgg-intro">{{ $intro }}</div>@endif
     @else
+        @if(! empty($document->include_arabic_salutation) && ! empty($brand['salam_data_uri']))
+            <div class="pgg-salam"><img src="{{ $brand['salam_data_uri'] }}" alt=""></div>
+        @endif
         <div class="pgg-title-center">{{ $title }}</div>
         <div class="pgg-cols">
             <div class="pgg-col-left">
                 <div class="pgg-recipient-label">{{ $customerLabel }}</div>
-                <div class="pgg-recipient-name">{{ $customer->name ?? 'Walk-in Customer' }}</div>
-                @if(! empty($customer?->attention_to))<div>Attn: {{ $customer->attention_to }}</div>@endif
+                @if($attn)<div class="pgg-recipient-attn">{{ $attn }}</div>@endif
+                <div>{{ $recipientName }}</div>
                 @if(! empty($customer?->address))<div>{{ $customer->address }}</div>@endif
-                @if($regionLine !== '')<div>{{ $regionLine }}</div>@endif
             </div>
             <div class="pgg-col-right">
                 <table class="pgg-meta">
                     @foreach($metaRows as $row)
-                        <tr><td class="k">{{ $row[0] }}</td><td class="v">{{ $row[1] }}</td></tr>
+                        <tr><td class="k">{{ $row[0] }}</td><td class="colon">:</td><td class="v">{{ $row[1] ?? '' }}</td></tr>
                     @endforeach
                 </table>
             </div>

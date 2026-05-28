@@ -1,16 +1,17 @@
 @php
     $num = $document->official_number ?? 'DRAFT';
+    $tarikh = $document->document_date
+        ? \Illuminate\Support\Carbon::parse($document->document_date)->locale('ms')->translatedFormat('d F Y')
+        : '';
     $pgg = [
         'label' => 'PROFORMA INVOICE',
         'titleWithSubject' => true,
         'style' => 'letter',
-        'customerLabel' => 'Bill To:',
         'extraNote' => 'This is a proforma invoice for your reference and is not a valid tax invoice.',
-        'intro' => 'Please find below our proforma invoice for your kind attention:',
         'meta' => [
-            ['Proforma No.', $num],
-            ['Date', optional($document->document_date)->format('d/m/Y')],
-            ['Valid Until', optional($document->due_date)->format('d/m/Y') ?: '30 days'],
+            ['Ruj. Tuan', ''],
+            ['No. Proforma', $num],
+            ['Tarikh', $tarikh],
         ],
         'terms' => [
             'All payment transfer or cheques should be made payable and crossed to PERSADA GEMILANG GLOBAL.',
