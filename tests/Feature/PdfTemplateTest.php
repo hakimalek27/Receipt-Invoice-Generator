@@ -43,6 +43,12 @@ class PdfTemplateTest extends TestCase
             'pdf.persada.quotation',
             'pdf.persada.delivery_order',
             'pdf.persada.official_receipt',
+            'pdf.persada.cash_bill',
+            'pdf.persada.proforma_invoice',
+            'pdf.persada.credit_note',
+            'pdf.persada.debit_note',
+            'pdf.persada.purchase_order',
+            'pdf.persada.payment_voucher',
             'pdf.virtuedamsel.invoice',
             'pdf.virtuedamsel.quotation',
             'pdf.virtuedamsel.delivery_order',
@@ -81,6 +87,12 @@ class PdfTemplateTest extends TestCase
             ['PGG', 'quotation'],
             ['PGG', 'delivery_order'],
             ['PGG', 'official_receipt'],
+            ['PGG', 'cash_bill'],
+            ['PGG', 'proforma_invoice'],
+            ['PGG', 'credit_note'],
+            ['PGG', 'debit_note'],
+            ['PGG', 'purchase_order'],
+            ['PGG', 'payment_voucher'],
             ['VD', 'invoice'],
             ['VD', 'quotation'],
             ['VD', 'delivery_order'],
@@ -279,6 +291,62 @@ class PdfTemplateTest extends TestCase
         $this->assertStringContainsString($invoice->official_number, $html);
         $this->assertStringContainsString('TXN-001', $html);
         $this->assertStringContainsString('Total Received', $html);
+    }
+
+    public function test_pgg_quotation_renders_subject_in_title_and_letterhead(): void
+    {
+        $company = Company::factory()->create(['code' => 'PGG']);
+        $document = $this->draft($company, 'quotation', 2, [
+            'subject' => 'Intelligent Fragrance System',
+        ]);
+
+        $data = app(PdfRenderService::class)->renderData($document);
+        $html = view('pdf.persada.quotation', $data)->render();
+
+        $this->assertStringContainsString('QUOTATION FOR INTELLIGENT FRAGRANCE SYSTEM', $html);
+        $this->assertStringContainsString('Dear Tan Sri', $html);
+        $this->assertStringContainsString('Yours sincerely,', $html);
+        // Letterhead asset is bundled in the repo, so brandPalette embeds it.
+        $this->assertArrayHasKey('letterhead_data_uri', $data['brand']);
+        $this->assertStringContainsString('pgg-letterhead-bg', $html);
+    }
+
+    public function test_pgg_product_row_renders_image_and_bullets(): void
+    {
+        $company = Company::factory()->create(['code' => 'PGG']);
+        $pngUri = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADggGOSHzRgAAAAABJRU5ErkJggg==';
+
+        $document = $this->workflow->createDraft([
+            'company_id' => $company->id,
+            'document_type' => 'quotation',
+            'subject' => 'Fragrance System',
+            'items' => [[
+                'description' => "SCENTURY SYSTEM\n- TWO-YEAR CONTRACT\n- MONTHLY ROTATION",
+                'image_url' => $pngUri,
+                'quantity' => 2,
+                'uom' => 'MONTHLY FEE',
+                'unit_price' => 250,
+            ]],
+        ]);
+
+        $html = view('pdf.persada.quotation', app(PdfRenderService::class)->renderData($document))->render();
+
+        $this->assertStringContainsString('pgg-prod-title', $html);
+        $this->assertStringContainsString('pgg-prod-img', $html);
+        $this->assertStringContainsString('- TWO-YEAR CONTRACT', $html);
+        $this->assertStringContainsString('(MONTHLY FEE)', $html);
+        $this->assertStringContainsString($pngUri, $html);
+    }
+
+    public function test_pgg_quotation_falls_back_without_subject(): void
+    {
+        $company = Company::factory()->create(['code' => 'PGG']);
+        $document = $this->draft($company, 'quotation', 1);
+
+        $html = view('pdf.persada.quotation', app(PdfRenderService::class)->renderData($document))->render();
+
+        $this->assertStringContainsString('class="pgg-title">QUOTATION<', $html);
+        $this->assertStringNotContainsString('QUOTATION FOR', $html);
     }
 
     private function seedNumberingPolicy(Company $company, string $documentType): NumberingPolicy

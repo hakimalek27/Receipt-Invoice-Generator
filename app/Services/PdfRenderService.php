@@ -158,6 +158,12 @@ class PdfRenderService
                 'quotation' => 'pdf.persada.quotation',
                 'delivery_order' => 'pdf.persada.delivery_order',
                 'official_receipt' => 'pdf.persada.official_receipt',
+                'cash_bill' => 'pdf.persada.cash_bill',
+                'proforma_invoice' => 'pdf.persada.proforma_invoice',
+                'credit_note' => 'pdf.persada.credit_note',
+                'debit_note' => 'pdf.persada.debit_note',
+                'purchase_order' => 'pdf.persada.purchase_order',
+                'payment_voucher' => 'pdf.persada.payment_voucher',
             ],
             'VD' => [
                 'invoice' => 'pdf.virtuedamsel.invoice',
@@ -238,12 +244,15 @@ class PdfRenderService
         // ~12 invoice rows on page 1 and ~15 on continuation pages; we chunk conservatively
         // so the "Continued on next page" footer/totals always land on the right logical page.
         $isWehdah = ($company?->code ?? null) === 'WS';
+        $isPgg = ($company?->code ?? null) === 'PGG';
         if ($document->document_type === 'delivery_order') {
-            $perPage = $isWehdah ? 24 : 20;
+            $perPage = $isWehdah ? 24 : ($isPgg ? 14 : 20);
         } elseif ($document->document_type === 'official_receipt') {
-            $perPage = $isWehdah ? 24 : 15;
+            $perPage = $isWehdah ? 24 : ($isPgg ? 12 : 15);
         } else {
-            $perPage = $isWehdah ? 18 : 15;
+            // PGG repeats the full-page letterhead on every page, pushing body
+            // content ~50mm down, so fewer rows fit per page.
+            $perPage = $isWehdah ? 18 : ($isPgg ? 10 : 15);
         }
         // Section header rows take vertical space too; trim per-page when any are present.
         if ($document->items->whereNotNull('section_header')->isNotEmpty()) {
@@ -328,6 +337,16 @@ class PdfRenderService
             $gradient = resource_path('views/pdf/persada/assets/header-gradient.png');
             if (is_file($gradient)) {
                 $palette['header_image_data_uri'] = 'data:image/png;base64,'.base64_encode(file_get_contents($gradient));
+            }
+            foreach ([
+                'letterhead_data_uri' => ['letterhead.jpg', 'image/jpeg'],
+                'salam_data_uri' => ['salam.png', 'image/png'],
+                'stamp_data_uri' => ['stamp.png', 'image/png'],
+            ] as $key => [$file, $mime]) {
+                $path = resource_path("views/pdf/persada/assets/{$file}");
+                if (is_file($path)) {
+                    $palette[$key] = 'data:'.$mime.';base64,'.base64_encode(file_get_contents($path));
+                }
             }
         }
 
