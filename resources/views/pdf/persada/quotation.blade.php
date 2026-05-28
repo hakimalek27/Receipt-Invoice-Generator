@@ -1,15 +1,16 @@
 @php
     $num = $document->official_number ?? 'DRAFT';
+    $tarikh = $document->document_date
+        ? \Illuminate\Support\Carbon::parse($document->document_date)->locale('ms')->translatedFormat('d F Y')
+        : '';
     $pgg = [
         'label' => 'QUOTATION',
         'titleWithSubject' => true,
         'style' => 'letter',
-        'customerLabel' => 'To:',
-        'intro' => 'Thank you for your inquiry. We are pleased to submit our quotation for your consideration:',
         'meta' => [
-            ['Ref No.', $num],
-            ['Date', optional($document->document_date)->format('d/m/Y')],
-            ['Valid Until', optional($document->due_date)->format('d/m/Y') ?: '30 days'],
+            ['Ruj. Tuan', ''],
+            ['Ruj. Kami', $num],
+            ['Tarikh', $tarikh],
         ],
         'terms' => [
             'All payment transfer or cheques should be made payable and crossed to PERSADA GEMILANG GLOBAL.',

@@ -1,15 +1,17 @@
 @php
     $num = $document->official_number ?? 'DRAFT';
+    $tarikh = $document->document_date
+        ? \Illuminate\Support\Carbon::parse($document->document_date)->locale('ms')->translatedFormat('d F Y')
+        : '';
     $pgg = [
         'label' => 'PURCHASE ORDER',
         'titleWithSubject' => true,
         'style' => 'letter',
         'customerLabel' => 'Supplier:',
-        'intro' => 'We are pleased to place the following purchase order. Kindly acknowledge receipt and confirm delivery schedule:',
         'meta' => [
-            ['PO No.', $num],
-            ['Date', optional($document->document_date)->format('d/m/Y')],
-            ['Required By', optional($document->due_date)->format('d/m/Y') ?: '-'],
+            ['Ruj. Tuan', ''],
+            ['No. PO', $num],
+            ['Tarikh', $tarikh],
         ],
         'terms' => [
             'Please quote our purchase order number on all delivery orders and invoices.',
