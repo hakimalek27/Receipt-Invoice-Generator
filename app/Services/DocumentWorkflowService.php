@@ -554,6 +554,7 @@ class DocumentWorkflowService
     {
         return [
             'name' => $customer->name,
+            'attention_to' => $customer->attention_to,
             'address' => $customer->address,
             'address_line_2' => $customer->address_line_2,
             'city' => $customer->city,

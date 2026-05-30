@@ -13,8 +13,8 @@
             ['Tarikh', $tarikh],
         ],
         'terms' => [
-            'All payment transfer or cheques should be made payable and crossed to PERSADA GEMILANG GLOBAL.',
-            'Please bank in to Bank Kerjasama Rakyat – 110 258 1847',
+            'All payment transfer or cheques should be made payable and crossed to <strong>PERSADA GEMILANG GLOBAL.</strong>',
+            'Please bank in to <strong>Bank Kerjasama Rakyat – 110 258 1847</strong>',
             'Goods sold are not returnable and not refundable.',
             'Validity of this quotation will end if the price changed.',
             'We trust that you will find our quote satisfactory and look forward for your response. Please contact us if have any question.',
