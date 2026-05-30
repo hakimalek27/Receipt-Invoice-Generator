@@ -6,7 +6,7 @@
         <div class="pgg-terms-head">Terms &amp; Conditions :</div>
         <ol>
             @foreach($terms as $term)
-                <li>{{ $term }}</li>
+                <li>{!! $term !!}</li>
             @endforeach
         </ol>
     </div>

@@ -4,19 +4,31 @@
     $headerFill = $scentury ? '#B8860B' : $navy;
 @endphp
 <style>
-    /* DomPDF ignores @page margins when paper is set via setPaper(), so content
-       clearance for the baked letterhead chrome is handled by the .pgg-frame
-       table's thead/tfoot spacers (they repeat on every page). The default
-       DomPDF margin (~12.5mm) provides the side gutters. */
-    @page { margin: 12mm; }
-    body { font-family: 'Helvetica', 'DejaVu Sans', sans-serif; font-size: 11pt; color: #000; margin: 0; }
+    /* Production renders with Playwright/Chromium (preferCSSPageSize), which honors
+       @page. A full-bleed page (margin:0) lets the fixed letterhead fill the sheet
+       edge-to-edge with no offset/clip (Chromium clips position:fixed to the page
+       content box, so any non-zero @page margin would crop the letterhead's bleed
+       graphics). Body padding sets the side gutters (aligned to the header rule)
+       and the bottom clearance for the corner decoration; per-page top clearance
+       is handled by a .pgg-page-top spacer emitted at the start of each chunk
+       in _body (the render pipeline emulates screen media, which disables
+       <thead> repeat — so per-chunk in-flow spacers are the robust mechanism). */
+    @page { size: A4; margin: 0; }
+    body { font-family: 'Helvetica', 'DejaVu Sans', sans-serif; font-size: 11pt; color: #000;
+           margin: 0; padding: 0 25mm 16mm; }
 
-    /* Pushes page-1 content below the baked letterhead header band (~53mm). */
-    .pgg-top-spacer { height: 55mm; }
-
-    /* Full-page letterhead, repeated behind content on every page. */
+    /* Full-page letterhead, painted behind content (fixed = repeats on every page). */
     .pgg-letterhead-bg { position: fixed; top: 0; left: 0; width: 210mm; height: 297mm; z-index: -1; }
     .pgg-letterhead-bg img { width: 210mm; height: 297mm; display: block; }
+
+    /* In-flow header clearance emitted at the start of every chunk (each chunk
+       starts a new page, so this gives consistent top clearance on every page). */
+    .pgg-page-top { height: 55mm; }
+
+    /* Appended artwork pages start on their own page (.page-break), where the body's
+       one-time top padding no longer applies, so re-clear the header band / corner
+       decoration per artwork page (body padding already handles the side gutters). */
+    .pgg-art-pages .page-break + div { padding-top: 55mm; padding-bottom: 16mm; }
 
     /* Salam sits in the body flow, centered, between the recipient/ref block
        and the salutation (matches the reference layout). */
@@ -31,7 +43,7 @@
     .pgg-extra-note { font-size: 9pt; font-style: italic; color: #444; margin: 0 0 8pt; }
 
     .pgg-cols { display: table; width: 100%; margin-bottom: 10pt; }
-    .pgg-col-left { display: table-cell; width: 58%; vertical-align: top; padding-right: 14px; font-size: 10pt; line-height: 1.45; }
+    .pgg-col-left { display: table-cell; width: 58%; vertical-align: top; padding-right: 14px; font-size: 10pt; line-height: 1.45; text-align: justify; }
     .pgg-col-right { display: table-cell; width: 42%; vertical-align: top; }
     .pgg-recipient-label { font-weight: bold; color: {{ $navy }}; margin-bottom: 3pt; }
     .pgg-recipient-attn { font-weight: bold; }
@@ -49,11 +61,11 @@
                          padding: 5pt 4pt; border: 0.75pt solid {{ $headerFill }}; text-align: center; }
     table.pgg-items td { border: 0.75pt solid #000; padding: 5pt 5pt; font-size: 10pt;
                          vertical-align: top; page-break-inside: avoid; }
-    .pgg-c-no { width: 6%; text-align: center; }
+    .pgg-c-no { width: 6%; text-align: center; vertical-align: middle; }
     .pgg-c-desc { width: 45.5%; }
-    .pgg-c-qty { width: 7.5%; text-align: center; }
-    .pgg-c-price { width: 20%; text-align: left; }
-    .pgg-c-total { width: 21%; text-align: left; }
+    .pgg-c-qty { width: 7.5%; text-align: center; vertical-align: middle; }
+    .pgg-c-price { width: 20%; text-align: left; vertical-align: middle; }
+    .pgg-c-total { width: 21%; text-align: left; vertical-align: middle; }
 
     .pgg-prod-title { font-weight: bold; text-align: center; margin: 2pt 0; }
     .pgg-prod-img { text-align: center; margin: 3pt 0; }
@@ -65,6 +77,7 @@
 
     tr.pgg-section td { background: #eef1f6; font-weight: bold; font-size: 9.5pt; text-align: left; }
     tr.pgg-grand td { background: #F2F2F2; font-weight: bold; }
+    tr.pgg-grand .pgg-sum-label { text-align: center; }
     tr.pgg-summary td { font-size: 9.5pt; }
     .pgg-sum-label { text-align: right; }
     .pgg-sum-val { text-align: left; }
