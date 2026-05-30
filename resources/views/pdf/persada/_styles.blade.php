@@ -51,7 +51,7 @@
 
     table.pgg-meta { width: 100%; font-size: 9.5pt; border-collapse: collapse; }
     table.pgg-meta td { padding: 1pt 0; vertical-align: top; }
-    table.pgg-meta .k { width: 38%; white-space: nowrap; }
+    table.pgg-meta .k { width: 38%; white-space: nowrap; text-align: right; padding-right: 4pt; }
     table.pgg-meta .colon { width: 5%; }
     table.pgg-meta .v { text-align: left; }
 
